@@ -3,13 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Sistema de Evaluación Automatizada para proyectos de RR.HH. y Derecho Laboral con rúbrica vigesimal.">
-    <title>Evaluador Automatizado de Proyectos | RR.HH. & Derecho Laboral</title>
-    
-    <!-- Hoja de estilos principal (Sincronizada con el nombre original) -->
-    <link rel="stylesheet" href="./index.css">
-    
-    <!-- Librerías CDN -->
+    <title>Evaluador Automatizado de Proyectos | RR.HH. &amp; Derecho Laboral</title>
+    <link rel="stylesheet" href="./styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -18,134 +13,125 @@
 </head>
 <body>
 
-    <!-- Banner de dependencias faltantes -->
     <div id="cdn-alert" class="cdn-alert hidden" role="alert" aria-live="assertive">
         <span class="cdn-alert-icon">⚠️</span>
-        <span id="cdn-alert-text">Verificando librerías necesarias...</span>
+        <span id="cdn-alert-text"></span>
+        <span class="cdn-alert-hint">— Verifica tu conexión a internet y recarga la página.</span>
     </div>
 
     <header class="app-header">
         <div class="header-container">
             <h1>Sistema de Evaluación Automatizada</h1>
-            <p>Programa de Educación & Gestión Humana | Rúbrica Vigesimal (0-20)</p>
+            <p>Programa de Educación &amp; Gestión Humana | Rúbrica Vigesimal (0-20)</p>
         </div>
     </header>
 
     <main class="main-container">
-        <!-- Dropzone de carga masiva -->
+
+        <!-- ========== SECCIÓN DE CARGA ========== -->
         <section class="upload-section">
-            <div id="drop-zone" class="drop-zone" tabindex="0" role="button"
-                 aria-label="Zona de carga. Arrastra documentos o presiona Enter para seleccionar archivos.">
+            <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Zona de carga. Arrastra archivos o haz clic para seleccionar.">
                 <div class="drop-zone-content">
-                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <h3>Arrastra aquí los archivos de los estudiantes</h3>
+                    <h3>Arrastra aquí archivos, carpetas o paquetes ZIP</h3>
                     <p>Formatos aceptados: PDF, DOCX, ZIP | También puedes cargar carpetas completas</p>
-                    <input type="file" id="file-input" multiple accept=".pdf,.docx,.zip" class="file-input"
-                           aria-label="Seleccionar archivos PDF, DOCX o ZIP">
+                    <input type="file" id="file-input" multiple accept=".pdf,.docx,.zip" class="file-input" aria-label="Seleccionar archivos">
                 </div>
             </div>
 
-            <!-- Botones de carga alternativa -->
             <div class="upload-actions">
-                <button id="btn-folder" class="btn btn-outline btn-sm" aria-label="Cargar carpeta completa">
-                    📁 Cargar Carpeta
+                <button id="btn-folder" class="btn btn-outline" aria-label="Cargar carpeta completa">
+                    📁 Cargar carpeta
                 </button>
-                <input type="file" id="folder-input" class="hidden" webkitdirectory multiple
-                       aria-label="Seleccionar carpeta con documentos">
+                <input type="file" id="folder-input" webkitdirectory multiple class="hidden-input" aria-label="Seleccionar carpeta">
                 <span id="folder-fallback-msg" class="fallback-msg hidden">
-                    💡 En este navegador, comprime los archivos en .zip y arrástralos aquí
+                    💡 En este navegador no se puede cargar carpetas. Usa el dropzone o comprime en ZIP.
                 </span>
             </div>
 
             <!-- Lista de archivos detectados -->
-            <div id="file-list" class="file-list hidden" aria-label="Archivos cargados">
+            <div id="file-list" class="file-list hidden">
                 <div class="file-list-header">
-                    <h4>Archivos detectados (<span id="file-count">0</span>)</h4>
+                    <span>📋 Archivos detectados: <strong id="file-count">0</strong></span>
                     <div class="file-stats">
-                        <span id="stat-pdf" class="stat-badge stat-pdf hidden">PDF: 0</span>
-                        <span id="stat-docx" class="stat-badge stat-docx hidden">DOCX: 0</span>
-                        <span id="stat-zip" class="stat-badge stat-zip hidden">ZIP: 0</span>
+                        <span id="stat-pdf" class="stat-badge stat-pdf hidden">📄 PDF: 0</span>
+                        <span id="stat-docx" class="stat-badge stat-docx hidden">📝 DOCX: 0</span>
+                        <span id="stat-zip" class="stat-badge stat-zip hidden">📦 ZIP: 0</span>
                     </div>
                 </div>
                 <ul id="file-list-items" class="file-list-items"></ul>
             </div>
         </section>
 
-        <!-- Barra de Estado y Acciones -->
+        <!-- ========== BARRA DE ESTADO Y ACCIONES ========== -->
         <section class="controls-section">
             <div class="status-box">
                 <span id="status-text">Esperando archivos...</span>
-                <progress id="progress-bar" value="0" max="100" class="hidden"
-                          aria-label="Progreso de procesamiento"></progress>
+                <progress id="progress-bar" value="0" max="100" class="hidden"></progress>
             </div>
             <div class="action-buttons">
-                <button id="btn-clear" class="btn btn-ghost btn-sm" disabled
-                        aria-label="Limpiar todos los resultados">🗑️ Limpiar</button>
+                <button id="btn-clear" class="btn btn-ghost btn-sm" disabled>🗑️ Limpiar todo</button>
                 <button id="btn-export-pdf" class="btn btn-secondary" disabled>📄 Exportar PDF</button>
                 <button id="btn-export-csv" class="btn btn-primary" disabled>📊 Exportar CSV</button>
             </div>
         </section>
 
-        <!-- Panel de errores acumulativos -->
-        <div id="error-panel" class="error-panel hidden" role="alert" aria-live="polite">
+        <!-- ========== PANEL DE ERRORES ========== -->
+        <section id="error-panel" class="error-panel hidden" role="alert" aria-live="polite">
             <div class="error-panel-header">
-                <span>⚠️ Se encontraron incidencias durante el procesamiento</span>
+                <span>⚠️ Errores durante el procesamiento</span>
                 <button id="btn-dismiss-errors" class="btn-close" aria-label="Cerrar panel de errores">&times;</button>
             </div>
             <ul id="error-list" class="error-list"></ul>
-        </div>
+        </section>
 
-        <!-- Tabla de Resultados Consolidada -->
+        <!-- ========== TABLA DE RESULTADOS ========== -->
         <section class="results-section">
             <div class="results-header">
                 <h2>Consolidado de Evaluaciones</h2>
-                <div class="results-toolbar">
-                    <input type="text" id="filter-input" class="filter-input"
-                           placeholder="🔍 Filtrar por nombre de estudiante..."
-                           aria-label="Filtrar resultados por nombre">
-                    <span id="results-count" class="results-count hidden">Mostrando 0 de 0</span>
+                <div class="results-tools">
+                    <input type="text" id="filter-input" class="filter-input" placeholder="🔍 Filtrar por nombre..." aria-label="Filtrar resultados por nombre de estudiante">
+                    <span id="results-count" class="results-count hidden"></span>
                 </div>
             </div>
             <div class="table-responsive">
-                <table id="results-table" class="results-table" aria-label="Tabla de resultados de evaluación">
+                <table id="results-table" class="results-table">
                     <thead>
                         <tr>
-                            <th data-sort="index" scope="col" class="sortable">#</th>
-                            <th data-sort="estudiante" scope="col" class="sortable">Estudiante / Archivo</th>
-                            <th data-sort="c1" scope="col" class="sortable">C1: Ley/Norma (5P)</th>
-                            <th data-sort="c2" scope="col" class="sortable">C2: Evidencias (7P)</th>
-                            <th data-sort="c3" scope="col" class="sortable">C3: Ética/RRHH (8P)</th>
-                            <th data-sort="notaFinal" scope="col" class="sortable">Nota (0-20)</th>
-                            <th data-sort="conectoresHallados" scope="col" class="sortable">Conectores</th>
-                            <th scope="col">Observaciones</th>
+                            <th data-sort="index" class="sortable" aria-sort="none">#</th>
+                            <th data-sort="estudiante" class="sortable" aria-sort="none">Estudiante / Archivo</th>
+                            <th data-sort="c1" class="sortable" aria-sort="none">C1: Ley/Norma (5P)</th>
+                            <th data-sort="c2" class="sortable" aria-sort="none">C2: Evidencias (7P)</th>
+                            <th data-sort="c3" class="sortable" aria-sort="none">C3: Ética/RRHH (8P)</th>
+                            <th data-sort="notaFinal" class="sortable" aria-sort="none">Nota (0-20)</th>
+                            <th data-sort="conectoresHallados" class="sortable" aria-sort="none">Conectores</th>
+                            <th>Observaciones</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr>
-                            <td colspan="8" class="empty-msg">
-                                No hay datos procesados. Sube archivos PDF, DOCX o ZIP para iniciar.
-                            </td>
+                            <td colspan="8" class="empty-msg">No hay datos procesados. Sube archivos PDF, DOCX o ZIP para iniciar.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </section>
+
     </main>
 
-    <!-- Overlay de carga con cancelación -->
-    <div id="loading-overlay" class="loading-overlay hidden" role="dialog" aria-modal="true"
-         aria-label="Procesando archivos">
+    <!-- ========== OVERLAY DE CARGA ========== -->
+    <div id="loading-overlay" class="loading-overlay hidden" role="dialog" aria-modal="true" aria-label="Procesando archivos">
         <div class="loading-card">
             <div class="spinner"></div>
             <h3 id="loading-title">Procesando archivos...</h3>
-            <p id="loading-detail">Preparando documentos</p>
-            <progress id="overlay-progress" value="0" max="100" aria-label="Progreso de carga"></progress>
+            <p id="loading-detail">Preparando...</p>
+            <progress id="overlay-progress" value="0" max="100"></progress>
             <span id="overlay-percent">0%</span>
-            <button id="btn-cancel" class="btn btn-ghost btn-sm">Cancelar</button>
+            <button id="btn-cancel" class="btn btn-ghost btn-sm hidden">Cancelar</button>
         </div>
     </div>
 
@@ -153,7 +139,6 @@
         <p>&copy; 2026 Sistema de Sistematización TIC - Gestión Ambiental y Recursos Humanos</p>
     </footer>
 
-    <!-- Script principal (Sincronizado con el nombre original) -->
-    <script src="./index.js" defer></script>
+    <script src="./app.js" defer></script>
 </body>
 </html>
