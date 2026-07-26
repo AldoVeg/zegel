@@ -11,24 +11,23 @@
     <!-- jsPDF y AutoTable para generación de reportes consolidado -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    <!-- Mammoth.js para extracción de texto de DOCX -->
+    <!-- Mammoth.js para procesamiento de DOCX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    <!-- JSZip para descompresión de archivos ZIP -->
+    <!-- JSZip para descompresión de ZIP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
-    <!-- Banner de alerta por falta de dependencias CDN -->
+    <!-- Banner de alerta CDN -->
     <div id="cdn-alert" class="cdn-alert hidden" role="alert" aria-live="assertive">
         <span>⚠️</span>
         <span id="cdn-alert-text"></span>
-        <span>— Recarga la página o verifica tu conexión a internet.</span>
     </div>
 
     <header class="app-header">
         <div class="header-container">
             <h1>Sistema de Evaluación Automatizada</h1>
-            <p>Programa de Educación & Gestión Humana | Rúbrica Vigesimal (0-20)</p>
+            <p>Programa de Educación & Gestión Humana | Rúbrica Vigesimal (0-20) | Auditor Estructural</p>
         </div>
     </header>
 
@@ -43,32 +42,27 @@
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
                     <h3>Arrastra aquí los archivos de los estudiantes</h3>
-                    <p>O haz clic para seleccionar múltiples documentos</p>
-                    <p class="format-hint">Formatos aceptados: PDF, DOCX, ZIP | También puedes cargar carpetas completas</p>
-                    <input type="file" id="file-input" multiple accept=".pdf,.docx,.zip" class="file-input" aria-label="Seleccionar archivos PDF, DOCX o ZIP">
+                    <p>Formatos aceptados: PDF, DOCX, ZIP | También puedes cargar carpetas completas</p>
+                    <input type="file" id="file-input" multiple accept=".pdf,.docx,.zip" class="file-input" aria-label="Seleccionar archivos">
                 </div>
             </div>
 
-            <!-- Carga de carpeta (Chromium/Windows) -->
-            <div class="folder-upload">
-                <button id="btn-folder" class="btn btn-outline" aria-label="Cargar carpeta completa">
-                    📁 Cargar carpeta
-                </button>
-                <input type="file" id="folder-input" webkitdirectory multiple class="hidden" aria-hidden="true">
-                <span id="folder-fallback-msg" class="fallback-msg hidden">
-                    💡 En este navegador no se puede cargar carpetas. Usa el dropzone o comprime en ZIP.
-                </span>
+            <!-- Botón de carga de carpeta -->
+            <div class="folder-upload-row">
+                <button id="btn-folder" class="btn btn-outline btn-sm">📁 Cargar carpeta</button>
+                <input type="file" id="folder-input" webkitdirectory multiple class="hidden-input" aria-label="Seleccionar carpeta">
+                <span id="folder-fallback-msg" class="fallback-msg hidden">Usa Chrome/Edge para cargar carpetas. En otros navegadores, comprime en ZIP.</span>
             </div>
 
             <!-- Lista de archivos detectados -->
             <div id="file-list" class="file-list hidden">
                 <div class="file-list-header">
-                    <span>📋 Archivos detectados: <strong id="file-count">0</strong></span>
-                    <div class="file-stats">
-                        <span id="stat-pdf" class="stat-badge stat-pdf hidden">📄 <span>0</span> PDF</span>
-                        <span id="stat-docx" class="stat-badge stat-docx hidden">📝 <span>0</span> DOCX</span>
-                        <span id="stat-zip" class="stat-badge stat-zip hidden">📦 <span>0</span> ZIP</span>
-                    </div>
+                    <span>📋 <strong id="file-count">0</strong> archivo(s) detectado(s)</span>
+                    <span class="file-stats">
+                        <span id="stat-pdf" class="stat-badge stat-pdf hidden">📄 PDF: 0</span>
+                        <span id="stat-docx" class="stat-badge stat-docx hidden">📝 DOCX: 0</span>
+                        <span id="stat-zip" class="stat-badge stat-zip hidden">📦 ZIP: 0</span>
+                    </span>
                 </div>
                 <ul id="file-list-items" class="file-list-items"></ul>
             </div>
@@ -81,23 +75,23 @@
                 <progress id="progress-bar" value="0" max="100" class="hidden"></progress>
             </div>
             <div class="action-buttons">
-                <button id="btn-clear" class="btn btn-ghost btn-sm" disabled aria-label="Limpiar todo">🗑️ Limpiar</button>
-                <button id="btn-export-pdf" class="btn btn-secondary" disabled>📄 Exportar Reporte PDF</button>
-                <button id="btn-export-csv" class="btn btn-primary" disabled>📊 Exportar Excel (CSV)</button>
+                <button id="btn-clear" class="btn btn-ghost btn-sm" disabled>🗑️ Limpiar</button>
+                <button id="btn-export-pdf" class="btn btn-secondary" disabled>📄 Exportar PDF</button>
+                <button id="btn-export-csv" class="btn btn-primary" disabled>📊 Exportar CSV</button>
             </div>
         </section>
 
         <!-- Panel de Errores -->
-        <section id="error-panel" class="error-panel hidden" role="alert" aria-live="polite">
-            <div class="error-panel-header">
+        <div id="error-panel" class="error-panel hidden" role="alert" aria-live="polite">
+            <div class="error-header">
                 <span>⚠️ Errores durante el procesamiento</span>
-                <button id="btn-dismiss-errors" class="btn-ghost btn-sm" aria-label="Cerrar panel de errores">✕</button>
+                <button id="btn-dismiss-errors" class="btn-close" aria-label="Cerrar panel de errores">&times;</button>
             </div>
             <ul id="error-list" class="error-list"></ul>
-        </section>
+        </div>
 
         <!-- Filtro de búsqueda -->
-        <div class="filter-bar">
+        <div class="filter-row">
             <input type="text" id="filter-input" class="filter-input" placeholder="🔍 Filtrar por nombre de estudiante..." aria-label="Filtrar resultados por nombre">
             <span id="results-count" class="results-count hidden"></span>
         </div>
@@ -106,22 +100,23 @@
         <section class="results-section">
             <h2>Consolidado de Evaluaciones</h2>
             <div class="table-responsive">
-                <table id="results-table" class="results-table">
+                <table id="results-table" class="results-table" role="table" aria-label="Resultados de evaluación">
                     <thead>
                         <tr>
-                            <th data-sort="index" class="sortable" scope="col" aria-sort="none">#</th>
-                            <th data-sort="estudiante" class="sortable" scope="col" aria-sort="none">Estudiante / Archivo</th>
-                            <th data-sort="c1" class="sortable" scope="col" aria-sort="none">C1: Ley/Norma (5P)</th>
-                            <th data-sort="c2" class="sortable" scope="col" aria-sort="none">C2: Evidencias (7P)</th>
-                            <th data-sort="c3" class="sortable" scope="col" aria-sort="none">C3: Ética/RRHH (8P)</th>
-                            <th data-sort="notaFinal" class="sortable" scope="col" aria-sort="none">Nota (0-20)</th>
-                            <th data-sort="conectoresHallados" class="sortable" scope="col" aria-sort="none">Conectores</th>
-                            <th scope="col">Observaciones y Fortalecimiento</th>
+                            <th>#</th>
+                            <th class="sortable" data-sort="estudiante" aria-sort="none">Estudiante / Archivo</th>
+                            <th class="sortable" data-sort="c1" aria-sort="none">C1: Normativa (5P)</th>
+                            <th class="sortable" data-sort="c2" aria-sort="none">C2: Evidencias (7P)</th>
+                            <th class="sortable" data-sort="c3" aria-sort="none">C3: Ética/RRHH (8P)</th>
+                            <th class="sortable" data-sort="notaFinal" aria-sort="none">Nota (0-20)</th>
+                            <th class="sortable" data-sort="wordCount" aria-sort="none">Extensión</th>
+                            <th>Bibliografía</th>
+                            <th>Observaciones</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr>
-                            <td colspan="8" class="empty-msg">No hay datos procesados. Sube los archivos para iniciar.</td>
+                            <td colspan="9" class="empty-msg">No hay datos procesados. Sube archivos PDF, DOCX o ZIP para iniciar.</td>
                         </tr>
                     </tbody>
                 </table>
