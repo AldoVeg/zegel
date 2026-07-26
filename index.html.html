@@ -6,15 +6,15 @@
     <meta name="description" content="Sistema automatizado de evaluación de RR.HH.">
     <title>Evaluación Automática RR.HH.</title>
     
-    <!-- Enlace al CSS con ruta relativa segura para GitHub Pages -->
-    <link rel="stylesheet" href="./styles.css">
+    <!-- Enlace estandarizado al archivo CSS -->
+    <link rel="stylesheet" href="./index.css">
     
-    <!-- Librerías Externas (CDN HTTPS requeridas por GitHub) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+    <!-- Librerías Externas HTTPS (Requeridas para GitHub Pages) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -30,7 +30,7 @@
             <button class="error-dismiss" aria-label="Cerrar error">&times;</button>
         </div>
 
-        <!-- Zona de Arrastre y Selección -->
+        <!-- Zona de Arrastre -->
         <section id="drop-zone" class="drop-zone" tabindex="0">
             <div class="drop-zone-content">
                 <span class="icon">📁</span>
@@ -41,12 +41,11 @@
                     <button id="btn-select-folder" class="btn btn-secondary">Seleccionar Carpeta</button>
                 </div>
             </div>
-            <!-- Inputs ocultos -->
             <input type="file" id="file-input" multiple accept=".pdf,.docx,.zip" hidden>
             <input type="file" id="folder-input" webkitdirectory directory multiple hidden>
         </section>
 
-        <!-- Lista de archivos en cola -->
+        <!-- Lista de Archivos -->
         <section id="file-list-container" class="file-list-section" hidden>
             <div class="list-header">
                 <h3>Archivos Detectados (<span id="file-count">0</span>)</h3>
@@ -67,7 +66,7 @@
             <p id="status-text">Esperando archivos...</p>
         </div>
 
-        <!-- Barra de Configuración y Exportación -->
+        <!-- Barra de Filtros y Configuración de Umbral -->
         <section id="filter-bar" class="controls-bar" hidden>
             <div class="settings-group">
                 <input type="text" id="filter-input" placeholder="🔍 Buscar estudiante..." class="search-input">
@@ -106,7 +105,7 @@
         </section>
     </main>
 
-    <!-- Overlay de Carga Modal -->
+    <!-- Modal de Carga -->
     <div id="loading-overlay" class="overlay" hidden>
         <div class="loader-card">
             <div class="spinner"></div>
@@ -115,7 +114,7 @@
         </div>
     </div>
 
-    <!-- Archivo Lógico Principal -->
+    <!-- Enlace estandarizado al archivo JavaScript -->
     <script src="./index.js" defer></script>
 </body>
 </html>
