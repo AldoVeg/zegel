@@ -1,8 +1,8 @@
 /* ============================================================
    index.js — Motor de Evaluación Automatizada (Equidad Evaluativa)
-   C1: 1.5 pts por tema detectado (3 temas = 4.5) + plus 0.5 con ley explícita
-   C2: 2.0 pts por tema con evidencia (3 temas = 6.0) + plus 1.0 con enlaces
-   C3: Evaluación precisa: postura ética (2.5) + rol RRHH (2.5) + acciones (3.0)
+   C1: Normativa - T1(Beneficios), T2(Acoso), T3(Flexibilidad)
+   C2: Evidencia - Casos/Noticias de T1, T2 y T3
+   C3: Reflexión - Ética, Rol RRHH, Acciones estratégicas
    Procesamiento en Fila India con recolección de basura (RAM)
    ============================================================ */
 
@@ -43,7 +43,6 @@ function configurePDFJS() {
 const yieldUI = () => new Promise(resolve => setTimeout(resolve, 15));
 
 // ─── Diccionarios de Evaluación por Tema ───
-// Cada tema tiene su propio diccionario para C1 (normas) y C2 (evidencias)
 const TEMAS = {
     beneficios: {
         label: 'Beneficios de Ley',
@@ -89,7 +88,6 @@ function detectFileType(file) { const name = file.name.toLowerCase(); if (name.e
 
 // ─── Extracción de Identidad del Estudiante ───
 function extractStudentIdentity(fileName, text) {
-    // 1. Buscar patrones de encabezado en el texto
     const patrones = [
         /(?:estudiante|alumno|autor|presentado\s*por|elaborado\s*por|nombre)\s*:\s*([^\n]{3,60})/i,
         /(?:estudiante|alumno|autor|presentado\s*por|elaborado\s*por|nombre)\s*[:\-]\s*([^\n]{3,60})/i
@@ -100,7 +98,6 @@ function extractStudentIdentity(fileName, text) {
             return match[1].trim().replace(/\s+/g, ' ');
         }
     }
-    // 2. Fallback: nombre del archivo sin extensión
     return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
 }
 
@@ -111,9 +108,9 @@ function detectSubtitles(text) {
     const patronesSubtitulo = [
         /^(introducción|desarrollo|conclusión|conclusiones|anexos|bibliografía|referencias|índice|resumen|abstract)$/im,
         /^(capítulo|tema|sección|unidad|módulo)\s*(n[°º]?\s*)?\d/i,
-        /^\d{1,2}[\.\)]\s+[A-ZÁÉÍÓÚÑ]/,  // 1. Título, 2) Título
-        /^[IVX]+[\.\)]\s+[A-ZÁÉÍÓÚÑ]/,    // I. Título, II) Título
-        /^[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{4,40}$/ // Línea corta en mayúsculas
+        /^\d{1,2}[\.\)]\s+[A-ZÁÉÍÓÚÑ]/,
+        /^[IVX]+[\.\)]\s+[A-ZÁÉÍÓÚÑ]/,
+        /^[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{4,40}$/
     ];
     for (const linea of lineas) {
         for (const p of patronesSubtitulo) {
@@ -126,15 +123,12 @@ function detectSubtitles(text) {
 // ─── Evaluación de Bibliografía ───
 function evaluateBibliografia(text) {
     const idxBib = text.search(/\b(bibliografía|referencias|fuentes\s+consultadas)\b/i);
-    if (idxBib === -1) {
-        return { ok: false, observacion: '❌ No se encontró sección de Bibliografía/Referencias.' };
-    }
+    if (idxBib === -1) return { ok: false, observacion: '❌ No se encontró sección de Bibliografía.' };
+    
     const bloqueBib = text.substring(idxBib);
     const enlaces = bloqueBib.match(/https?:\/\/[^\s]+/gi) || [];
-    if (enlaces.length < 3) {
-        return { ok: false, observacion: `⚠️ Bibliografía presente pero solo ${enlaces.length} enlace(s). Se requieren al menos 3 fuentes con URL.` };
-    }
-    // Verificar orden alfabético aproximado
+    if (enlaces.length < 3) return { ok: false, observacion: `⚠️ Solo ${enlaces.length} enlace(s). Se requieren al menos 3 fuentes.` };
+    
     const lineas = bloqueBib.split(/\n/).filter(l => /^[a-záéíóúñ]/.test(l.trim().toLowerCase()));
     let ordenado = true;
     for (let i = 1; i < Math.min(lineas.length, 10); i++) {
@@ -142,20 +136,15 @@ function evaluateBibliografia(text) {
             ordenado = false; break;
         }
     }
-    if (!ordenado) {
-        return { ok: false, observacion: `⚠️ Bibliografía con ${enlaces.length} enlaces, pero no está en orden alfabético estricto.` };
-    }
+    if (!ordenado) return { ok: false, observacion: `⚠️ Bibliografía con ${enlaces.length} enlaces, pero no en orden alfabético estricto.` };
+    
     return { ok: true, observacion: `✅ Bibliografía completa con ${enlaces.length} fuentes en orden alfabético.` };
 }
 
 // ═══════════════════════════════════════════════════════════
-// NUEVO MOTOR DE EVALUACIÓN EQUITATIVA
+// MOTOR DE EVALUACIÓN
 // ═══════════════════════════════════════════════════════════
 
-/**
- * Detecta si un tema está presente en el texto usando su diccionario C1.
- * Un tema se considera presente si tiene al menos 2 palabras clave del diccionario.
- */
 function detectarTema(temaKey, text) {
     const dic = TEMAS[temaKey];
     const matches = [];
@@ -171,12 +160,7 @@ function detectarTema(temaKey, text) {
     return { presente: matches.length >= 2, matches, score };
 }
 
-/**
- * C1: Normativa Perú (0-5 pts)
- * Cada tema detectado con explicación y sustento = 1.5 pts.
- * 3 temas = 4.5 pts base.
- * Plus de 0.5 si los 3 temas están presentes Y hay al menos 1 ley/N° explícita.
- */
+// C1: Normativa Perú
 function evaluateC1(text) {
     const resultados = {};
     let temasDetectados = 0;
@@ -185,33 +169,24 @@ function evaluateC1(text) {
     for (const [key, tema] of Object.entries(TEMAS)) {
         const deteccion = detectarTema(key, text);
         resultados[key] = deteccion;
-        if (deteccion.presente) {
-            temasDetectados++;
-        } else {
-            observaciones.push('Tema "' + tema.label + '" no detectado o sin sustento normativo.');
-        }
+        if (deteccion.presente) temasDetectados++;
+        else observaciones.push('Falta desarrollo normativo del tema: ' + tema.label);
     }
 
     let puntaje = temasDetectados * 1.5;
-
     const tieneLeyExplicita = /(ley\s*(n°|nº|nro|núm)?\s*\d{3,5}|decreto\s*(supremo|legislativo|de urgencia)?\s*(n°|nº|nro|núm)?\s*\d{2,5}|d\.?s\.?\s*(n°|nº|nro|núm)?\s*\d{2,5}|constitución\s*política)/gi.test(text);
 
     if (temasDetectados === 3 && tieneLeyExplicita) {
         puntaje = 5.0;
-        observaciones.push('✅ Plus 0.5: los 3 temas con referencias normativas explícitas del Perú.');
+        observaciones.push('✅ Plus 0.5: 3 temas con referencias normativas explícitas.');
     } else if (temasDetectados === 3 && !tieneLeyExplicita) {
         puntaje = 4.5;
-        observaciones.push('⚠️ Los 3 temas presentes, pero falta citar una ley/N° explícita para el plus 0.5.');
     }
 
     return { puntaje: Math.min(5, puntaje), temasDetectados, detalle: resultados, observaciones };
 }
 
-/**
- * C2: Casos Reales Peruanos (0-7 pts)
- * Cada tema con evidencia = 2.0 pts. 3 temas = 6.0 pts base.
- * Plus de 1.0 si hay enlaces verificables (URLs) en al menos 2 temas.
- */
+// C2: Casos Reales Peruanos
 function evaluateC2(text) {
     const resultados = {};
     let temasConEvidencia = 0;
@@ -232,7 +207,7 @@ function evaluateC2(text) {
             temasConEvidencia++;
             if (tieneEnlace) temasConEnlace++;
         } else {
-            observaciones.push('Tema "' + tema.label + '" sin evidencia de caso real peruano.');
+            observaciones.push('Falta evidencia de caso real para: ' + tema.label);
         }
     }
 
@@ -240,34 +215,19 @@ function evaluateC2(text) {
 
     if (temasConEvidencia === 3 && temasConEnlace >= 2) {
         puntaje = 7.0;
-        observaciones.push('✅ Plus 1.0: evidencia con enlaces verificables en al menos 2 temas.');
-    } else if (temasConEvidencia === 3 && temasConEnlace < 2) {
-        puntaje = 6.0;
-        observaciones.push('⚠️ Los 3 temas con evidencia, pero faltan enlaces verificables para el plus 1.0.');
-    } else if (enlaces.length === 0) {
-        observaciones.push('❌ No se encontraron enlaces verificables en ningún tema.');
+        observaciones.push('✅ Plus 1.0: Casos reales con enlaces verificables en temas.');
     }
 
-    return { puntaje: Math.min(7, puntaje), temasConEvidencia, temasConEnlace, totalEnlaces: enlaces.length, detalle: resultados, observaciones };
+    return { puntaje: Math.min(7, puntaje), temasConEvidencia, detalle: resultados, observaciones };
 }
 
-/**
- * C3: Ética y Rol de RR.HH. (0-8 pts)
- * Evaluación precisa con 3 sub-criterios:
- *   3A. Postura ética explícita (0-2.5 pts)
- *   3B. Rol estratégico de RR.HH. (0-2.5 pts)
- *   3C. Acciones estratégicas por tema (0-3.0 pts) — 1 idea sustantiva por tema = 1.0 pt
- * Se aísla el último 30% del texto como bloque de reflexión.
- */
+// C3: Ética y Rol de RR.HH.
 function evaluateC3(text, resultadosC1) {
     const observaciones = [];
-
     const palabras = text.split(/\s+/);
     const puntoCorte = Math.floor(palabras.length * 0.7);
     const bloqueReflexion = palabras.slice(puntoCorte).join(' ');
-    const textoCompleto = text;
 
-    // 3A. Postura ética explícita (0-2.5 pts)
     const marcadoresEtica = ['ética', 'código de ética', 'postura', 'moral', 'valores', 'principios', 'deontología', 'integridad', 'responsabilidad', 'transparencia'];
     let scoreEtica = 0;
     for (const m of marcadoresEtica) {
@@ -275,101 +235,77 @@ function evaluateC3(text, resultadosC1) {
         scoreEtica += (bloqueReflexion.match(regex) || []).length;
     }
     const ptsEtica = scoreEtica >= 5 ? 2.5 : scoreEtica >= 2 ? 1.5 : scoreEtica >= 1 ? 0.8 : 0;
-    if (ptsEtica < 1.5) observaciones.push('Postura ética débil o ausente en la reflexión final.');
+    if (ptsEtica < 1.5) observaciones.push('Postura ética débil.');
 
-    // 3B. Rol estratégico de RR.HH. (0-2.5 pts)
-    const marcadoresRRHH = ['recursos humanos', 'rr.hh', 'rrhh', 'gestión humana', 'talento humano', 'área de personal', 'departamento de rrhh', 'profesional de rrhh', 'gestor', 'liderazgo', 'cultura organizacional', 'clima laboral'];
+    const marcadoresRRHH = ['recursos humanos', 'rr.hh', 'rrhh', 'gestión humana', 'talento humano', 'área de personal', 'departamento de rrhh', 'profesional', 'liderazgo', 'cultura organizacional'];
     let scoreRRHH = 0;
     for (const m of marcadoresRRHH) {
         const regex = new RegExp('\\b' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
         scoreRRHH += (bloqueReflexion.match(regex) || []).length;
     }
     const ptsRRHH = scoreRRHH >= 4 ? 2.5 : scoreRRHH >= 2 ? 1.5 : scoreRRHH >= 1 ? 0.8 : 0;
-    if (ptsRRHH < 1.5) observaciones.push('No se atribuyen acciones concretas al profesional de RR.HH.');
+    if (ptsRRHH < 1.5) observaciones.push('Falta rol del profesional de RR.HH.');
 
-    // 3C. Acciones estratégicas por tema (0-3.0 pts)
     const temasDetectados = resultadosC1 ? resultadosC1.temasDetectados : 0;
     let ptsAcciones = 0;
     if (temasDetectados >= 1) {
-        const marcadoresAccion = ['protocolo', 'capacitación', 'prevención', 'estrategia', 'plan', 'política', 'programa', 'intervención', 'sensibilización', 'monitoreo', 'evaluación', 'mejora', 'implementar', 'diseñar', 'ejecutar', 'supervisar'];
+        const marcadoresAccion = ['protocolo', 'capacitación', 'prevención', 'estrategia', 'plan', 'política', 'programa', 'intervención', 'sensibilización', 'monitoreo', 'mejora', 'implementar'];
         let scoreAccion = 0;
         for (const m of marcadoresAccion) {
             const regex = new RegExp('\\b' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-            scoreAccion += (textoCompleto.match(regex) || []).length;
+            scoreAccion += (text.match(regex) || []).length;
         }
         ptsAcciones = Math.min(3.0, temasDetectados * 1.0);
         if (scoreAccion < temasDetectados * 2) {
             ptsAcciones = Math.min(3.0, Math.max(0.5, scoreAccion * 0.3));
-            observaciones.push('Las acciones estratégicas por tema son genéricas; falta profundidad.');
         }
-    } else {
-        observaciones.push('Sin temas detectados en C1, no se pueden evaluar acciones por tema.');
     }
 
     const puntaje = Math.round((ptsEtica + ptsRRHH + ptsAcciones) * 10) / 10;
-
-    if (puntaje >= 7) observaciones.push('✅ Reflexión ética sólida con acciones estratégicas claras para RR.HH.');
-    else if (puntaje >= 5) observaciones.push('⚠️ Reflexión aceptable pero requiere mayor profundidad ética y estratégica.');
-    else observaciones.push('❌ La reflexión ética y el rol de RR.HH. son insuficientes.');
-
     return { puntaje: Math.min(8, puntaje), detalle: { ptsEtica, ptsRRHH, ptsAcciones }, observaciones };
 }
 
-/**
- * Evaluación consolidada: orquesta C1 + C2 + C3 + extensión + subtítulos + bibliografía
- * (Actualizada con Checks visuales solicitados)
- */
+// Orquestador de Evaluación 
 function evaluateContent(fileName, text) {
     const obs = [];
-    const wordCount = text.split(/\s+/).filter(function(w) { return w.length > 1; }).length;
+    const wordCount = text.split(/\s+/).filter(w => w.length > 1).length;
 
-    // ── Extensión textual ──
-    if (wordCount < 700) obs.push('⚠️ Extensión baja (' + wordCount + ' palabras). Falta profundidad argumentativa.');
-    else if (wordCount < 1000) obs.push('📝 Extensión aceptable (' + wordCount + ' palabras). Podría ampliarse.');
-    else obs.push('✅ Extensión adecuada (' + wordCount + ' palabras). Abundancia argumentativa.');
+    if (wordCount < 700) obs.push('⚠️ Extensión baja (' + wordCount + ' pal).');
+    else if (wordCount < 1000) obs.push('📝 Extensión aceptable (' + wordCount + ' pal).');
+    else obs.push('✅ Extensión adecuada (' + wordCount + ' pal).');
 
-    // ── Penalización de subtítulos ──
     const subtitulos = detectSubtitles(text);
-    if (subtitulos.count > 3) obs.push('❌ Se detectaron ' + subtitulos.count + ' subtítulos. La redacción debe ser puramente narrativa.');
-    else if (subtitulos.count > 0) obs.push('⚠️ Se detectaron ' + subtitulos.count + ' subtítulos. Evitar estructuras de informe.');
+    if (subtitulos.count > 3) obs.push('❌ Subtítulos detectados (' + subtitulos.count + '). Debe ser narrativa.');
 
-    // ── C1: Normativa Perú ──
+    // ── C1: Normativa Perú (Checks por Tema 1, 2, 3) ──
     const resC1 = evaluateC1(text);
-    const checksC1 = (resC1.detalle.beneficios.presente ? '✅' : '❌') + ' ' +
-                     (resC1.detalle.acoso.presente ? '✅' : '❌') + ' ' +
+    const checksC1 = (resC1.detalle.beneficios.presente ? '✅' : '❌') + 
+                     (resC1.detalle.acoso.presente ? '✅' : '❌') + 
                      (resC1.detalle.flexibilidad.presente ? '✅' : '❌');
-                     
-    obs.push('C1: ' + resC1.puntaje + '/5 [' + checksC1 + '] — ' + resC1.temasDetectados + '/3 temas con normativa.');
     obs.push.apply(obs, resC1.observaciones);
 
-    // ── C2: Casos Reales ──
+    // ── C2: Casos Reales (Checks por Evidencia T1, T2, T3) ──
     const resC2 = evaluateC2(text);
-    const checksC2 = (resC2.detalle.beneficios.presente ? '✅' : '❌') + ' ' +
-                     (resC2.detalle.acoso.presente ? '✅' : '❌') + ' ' +
+    const checksC2 = (resC2.detalle.beneficios.presente ? '✅' : '❌') + 
+                     (resC2.detalle.acoso.presente ? '✅' : '❌') + 
                      (resC2.detalle.flexibilidad.presente ? '✅' : '❌');
-                     
-    obs.push('C2: ' + resC2.puntaje + '/7 [' + checksC2 + '] — ' + resC2.temasConEvidencia + '/3 temas con evidencia (' + resC2.totalEnlaces + ' enlaces).');
     obs.push.apply(obs, resC2.observaciones);
 
-    // ── C3: Ética y RR.HH. ──
+    // ── C3: Ética y RR.HH. (Checks por Ética, Postura RRHH, Acciones) ──
     const resC3 = evaluateC3(text, resC1);
-    const checksC3 = (resC3.detalle.ptsEtica >= 0.8 ? '✅' : '❌') + ' ' +
-                     (resC3.detalle.ptsRRHH >= 0.8 ? '✅' : '❌') + ' ' +
+    const checksC3 = (resC3.detalle.ptsEtica >= 0.8 ? '✅' : '❌') + 
+                     (resC3.detalle.ptsRRHH >= 0.8 ? '✅' : '❌') + 
                      (resC3.detalle.ptsAcciones > 0 ? '✅' : '❌');
-                     
-    obs.push('C3: ' + resC3.puntaje + '/8 [' + checksC3 + '] — Ética: ' + resC3.detalle.ptsEtica + ' | RRHH: ' + resC3.detalle.ptsRRHH + ' | Acciones: ' + resC3.detalle.ptsAcciones);
     obs.push.apply(obs, resC3.observaciones);
 
-    // ── Conectores ──
+    // Conectores & Bibliografía
     let conectores = 0;
-    CONECTORES.forEach(function(c) { if (text.includes(c)) conectores++; });
-    if (conectores < 3) obs.push('Fortalecer uso de conectores lógicos.');
+    CONECTORES.forEach(c => { if (text.includes(c)) conectores++; });
+    if (conectores < 3) obs.push('Faltan conectores lógicos.');
 
-    // ── Bibliografía ──
     const resBib = evaluateBibliografia(text);
     obs.push(resBib.observacion);
 
-    // ── Nota final ──
     const notaFinal = Math.round((resC1.puntaje + resC2.puntaje + resC3.puntaje) * 10) / 10;
     const estudiante = extractStudentIdentity(fileName, text);
 
@@ -389,7 +325,7 @@ function evaluateContent(fileName, text) {
     };
 }
 
-// ─── EXTRACCIÓN OPTIMIZADA CON LIMPIEZA DE RAM Y MICRO-BARRAS ───
+// ─── LECTORES (PDF/DOCX/ZIP) OPTIMIZADOS PARA RAM ───
 async function extractTextFromPDF(file) {
     let arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -399,18 +335,19 @@ async function extractTextFromPDF(file) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        fullText += textContent.items.map(function(item) { return item.str; }).join(' ') + ' ';
-        page.cleanup();
+        fullText += textContent.items.map(item => item.str).join(' ') + ' ';
+        page.cleanup(); // Liberar memoria de la página
 
-        DOM['status-text'].innerHTML =
-            '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
-            '<span>Leyendo: <strong>' + file.name.substring(0, 25) + '...</strong></span>' +
-            '<span>Página ' + i + ' de ' + pdf.numPages + '</span>' +
-            '<progress value="' + i + '" max="' + pdf.numPages + '" style="width:100%;height:6px;border-radius:3px;"></progress>' +
-            '</div>';
+        if (DOM['status-text']) {
+            DOM['status-text'].innerHTML =
+                '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
+                '<span>Leyendo PDF: <strong>' + file.name.substring(0, 25) + '...</strong></span>' +
+                '<span>Página ' + i + ' de ' + pdf.numPages + '</span>' +
+                '<progress value="' + i + '" max="' + pdf.numPages + '" style="width:100%;height:6px;border-radius:3px;"></progress>' +
+                '</div>';
+        }
         await yieldUI();
     }
-
     await loadingTask.destroy();
     arrayBuffer = null;
     return fullText.toLowerCase();
@@ -418,12 +355,9 @@ async function extractTextFromPDF(file) {
 
 async function extractTextFromDOCX(file) {
     let arrayBuffer = await file.arrayBuffer();
-    DOM['status-text'].innerHTML =
-        '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
-        '<span>Leyendo: <strong>' + file.name.substring(0, 25) + '...</strong></span>' +
-        '<span>Extrayendo DOCX...</span>' +
-        '<progress style="width:100%;height:6px;border-radius:3px;"></progress>' +
-        '</div>';
+    if (DOM['status-text']) {
+        DOM['status-text'].innerHTML = 'Extrayendo DOCX: <strong>' + file.name.substring(0, 25) + '...</strong>';
+    }
     await yieldUI();
     let result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
     let text = result.value.toLowerCase();
@@ -435,7 +369,7 @@ async function extractTextFromDOCX(file) {
 async function extractFilesFromZip(zipFile) {
     let extracted = [];
     const zip = await JSZip.loadAsync(zipFile);
-    const entries = Object.values(zip.files).filter(function(entry) { return !entry.dir; });
+    const entries = Object.values(zip.files).filter(entry => !entry.dir);
 
     for (let i = 0; i < entries.length; i++) {
         const zipEntry = entries[i];
@@ -453,27 +387,29 @@ async function extractFilesFromZip(zipFile) {
     return extracted;
 }
 
-// ─── UI: Lista de archivos ───
+// ─── UI DE ARCHIVOS E INTERACCIÓN ───
 function updateFileListUI() {
     const listEl = DOM['file-list-items'];
     const fileList = DOM['file-list'];
+    if (!listEl || !fileList) return;
+    
     listEl.innerHTML = '';
     if (archivosDetectados.length === 0) {
         fileList.classList.add('hidden');
-        DOM['status-text'].innerHTML = 'Esperando archivos...';
+        if (DOM['status-text']) DOM['status-text'].innerHTML = 'Esperando archivos...';
         return;
     }
     fileList.classList.remove('hidden');
-    DOM['file-count'].textContent = archivosDetectados.length;
-    DOM['status-text'].innerHTML = archivosDetectados.length + ' archivo(s) listos para evaluar.';
+    if (DOM['file-count']) DOM['file-count'].textContent = archivosDetectados.length;
+    if (DOM['status-text']) DOM['status-text'].innerHTML = archivosDetectados.length + ' archivo(s) listos para evaluar.';
 
     let cPDF = 0, cDOCX = 0, cZIP = 0;
-    archivosDetectados.forEach(function(f) {
+    archivosDetectados.forEach(f => {
         if (f.type === 'pdf') cPDF++;
         else if (f.type === 'docx') cDOCX++;
         else if (f.type === 'zip') cZIP++;
     });
-    var ts = function(el, c) {
+    const ts = (el, c) => {
         if (c > 0) { el.classList.remove('hidden'); el.textContent = el.textContent.replace(/\d+/, c); }
         else el.classList.add('hidden');
     };
@@ -481,7 +417,7 @@ function updateFileListUI() {
     if (DOM['stat-docx']) ts(DOM['stat-docx'], cDOCX);
     if (DOM['stat-zip']) ts(DOM['stat-zip'], cZIP);
 
-    archivosDetectados.forEach(function(f, i) {
+    archivosDetectados.forEach((f, i) => {
         const chip = document.createElement('li');
         chip.className = 'file-chip';
         chip.innerHTML =
@@ -490,8 +426,8 @@ function updateFileListUI() {
             '<button class="chip-remove" data-index="' + i + '">&times;</button>';
         listEl.appendChild(chip);
     });
-    listEl.querySelectorAll('.chip-remove').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
+    listEl.querySelectorAll('.chip-remove').forEach(btn => {
+        btn.addEventListener('click', e => {
             e.stopPropagation();
             if (isProcessing) return;
             archivosDetectados.splice(parseInt(btn.dataset.index), 1);
@@ -500,12 +436,12 @@ function updateFileListUI() {
     });
 }
 
-async function addFilesToList(files) {
+function addFilesToList(files) {
     const validTypes = ['pdf', 'docx', 'zip'];
     let added = 0;
     for (let i = 0; i < files.length; i++) {
         const type = detectFileType(files[i]);
-        if (validTypes.includes(type) && !archivosDetectados.some(function(f) { return f.name === files[i].name && f.size === files[i].size; })) {
+        if (validTypes.includes(type) && !archivosDetectados.some(f => f.name === files[i].name && f.size === files[i].size)) {
             archivosDetectados.push({ name: files[i].name, type: type, file: files[i], size: files[i].size });
             added++;
         }
@@ -513,7 +449,6 @@ async function addFilesToList(files) {
     if (added > 0) updateFileListUI();
 }
 
-// ─── Panel de errores ───
 function addError(archivo, mensaje) {
     if(!DOM['error-panel']) return;
     DOM['error-panel'].classList.remove('hidden');
@@ -522,27 +457,21 @@ function addError(archivo, mensaje) {
     DOM['error-list'].appendChild(li);
 }
 
-// ─── PROCESAMIENTO ESTRICTO EN FILA INDIA (SECUENCIAL) ───
+// ─── PROCESAMIENTO ESTRICTO EN FILA INDIA ───
 async function processAllFiles() {
-    if (isProcessing) return;
-    if (archivosDetectados.length === 0) return;
+    if (isProcessing || archivosDetectados.length === 0) return;
 
     isProcessing = true;
     abortController = new AbortController();
     const signal = abortController.signal;
 
     resultadosEvaluacion = [];
-    DOM['table-body'].innerHTML = '';
+    if (DOM['table-body']) DOM['table-body'].innerHTML = '';
     
     if (DOM['error-list']) DOM['error-list'].innerHTML = '';
     if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
-    if (DOM['progress-bar']) {
-        DOM['progress-bar'].classList.remove('hidden');
-        DOM['progress-bar'].value = 0;
-    }
-
+    if (DOM['progress-bar']) { DOM['progress-bar'].classList.remove('hidden'); DOM['progress-bar'].value = 0; }
     if (DOM['loading-overlay']) DOM['loading-overlay'].classList.remove('hidden');
-    if (DOM['btn-cancel']) DOM['btn-cancel'].classList.remove('hidden');
 
     try {
         let cola = archivosDetectados.slice();
@@ -558,44 +487,32 @@ async function processAllFiles() {
                 if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Extrayendo ZIP: ' + item.name + '...';
                 try {
                     let extracted = await extractFilesFromZip(item.file);
-                    for (let e = extracted.length - 1; e >= 0; e--) {
-                        cola.unshift(extracted[e]);
-                    }
+                    for (let e = extracted.length - 1; e >= 0; e--) cola.unshift(extracted[e]);
                     total += extracted.length - 1;
-                } catch (e) {
-                    addError(item.name, 'Error ZIP: ' + e.message);
-                }
-                item.file = null;
-                item = null;
+                } catch (e) { addError(item.name, 'Error ZIP: ' + e.message); }
+                item.file = null; item = null;
                 continue;
             }
 
             procesados++;
-            if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Procesando archivo ' + procesados + ' de ' + total;
+            if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Procesando ' + procesados + ' de ' + total;
             if (DOM['overlay-progress']) DOM['overlay-progress'].value = Math.round((procesados / total) * 100);
             if (DOM['overlay-percent']) DOM['overlay-percent'].textContent = Math.round((procesados / total) * 100) + '%';
             if (DOM['progress-bar']) DOM['progress-bar'].value = Math.round((procesados / total) * 100);
 
             try {
                 let text = '';
-                if (item.type === 'pdf') {
-                    text = await extractTextFromPDF(item.file);
-                } else if (item.type === 'docx') {
-                    text = await extractTextFromDOCX(item.file);
-                }
+                if (item.type === 'pdf') text = await extractTextFromPDF(item.file);
+                else if (item.type === 'docx') text = await extractTextFromDOCX(item.file);
 
-                if (!text || text.trim().length < 50) {
-                    addError(item.name, 'Documento vacío o ilegible.');
-                } else {
-                    resultadosEvaluacion.push(evaluateContent(item.name, text));
-                }
+                if (!text || text.trim().length < 50) addError(item.name, 'Documento vacío o ilegible.');
+                else resultadosEvaluacion.push(evaluateContent(item.name, text));
                 text = null;
             } catch (err) {
                 addError(item.name, 'Error: ' + err.message);
             }
 
-            item.file = null;
-            item = null;
+            item.file = null; item = null;
             await yieldUI();
         }
     } finally {
@@ -604,19 +521,19 @@ async function processAllFiles() {
         if (DOM['progress-bar']) DOM['progress-bar'].classList.add('hidden');
 
         if (resultadosEvaluacion.length > 0) {
-            DOM['status-text'].textContent = '¡Completado! Evaluados ' + resultadosEvaluacion.length + ' de ' + archivosDetectados.length + ' archivos.';
+            if (DOM['status-text']) DOM['status-text'].textContent = '¡Completado! Evaluados ' + resultadosEvaluacion.length + ' archivos.';
             if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = false;
             if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = false;
             if (DOM['btn-clear']) DOM['btn-clear'].disabled = false;
             renderTable();
             saveState();
         } else {
-            DOM['status-text'].textContent = 'Ocurrió un error general o no hubo archivos válidos.';
+            if (DOM['status-text']) DOM['status-text'].textContent = 'No hubo archivos válidos o proceso cancelado.';
         }
     }
 }
 
-// ─── Render de Tabla ───
+// ─── TABLA DE RESULTADOS CON LOS CHECKS VINCULADOS ───
 function renderTable(fText) {
     fText = fText || '';
     const tbody = DOM['table-body'];
@@ -625,7 +542,7 @@ function renderTable(fText) {
     tbody.innerHTML = '';
     let sorted = resultadosEvaluacion.slice();
     if (sortColumn) {
-        sorted.sort(function(a, b) {
+        sorted.sort((a, b) => {
             let vA = a[sortColumn], vB = b[sortColumn];
             if (typeof vA === 'string') vA = vA.toLowerCase();
             if (typeof vB === 'string') vB = vB.toLowerCase();
@@ -634,7 +551,7 @@ function renderTable(fText) {
             return 0;
         });
     }
-    let fil = fText ? sorted.filter(function(r) { return r.estudiante.toLowerCase().includes(fText.toLowerCase()); }) : sorted;
+    let fil = fText ? sorted.filter(r => r.estudiante.toLowerCase().includes(fText.toLowerCase())) : sorted;
     if (fil.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="empty-msg">Sin datos.</td></tr>';
         if(DOM['results-count']) DOM['results-count'].classList.add('hidden');
@@ -645,18 +562,19 @@ function renderTable(fText) {
         DOM['results-count'].textContent = 'Mostrando ' + fil.length + ' de ' + resultadosEvaluacion.length;
     }
     
-    fil.forEach(function(r) {
+    fil.forEach(r => {
         const idx = resultadosEvaluacion.indexOf(r) + 1;
         const badgeClass = r.notaFinal >= 14 ? 'badge-success' : (r.notaFinal >= 11 ? 'badge-warning' : 'badge-danger');
         const bibIcon = r.bibliografia && r.bibliografia.ok ? '✅' : '❌';
         
         const tr = document.createElement('tr');
+        // Aquí se inyectan los Checks visuales (✅/❌) exactamente debajo del puntaje.
         tr.innerHTML =
             '<td>' + idx + '</td>' +
             '<td><strong>' + escapeHTML(r.estudiante) + '</strong></td>' +
-            '<td style="text-align:center;">' + r.c1 + ' / 5<br><span style="font-size:0.8rem; letter-spacing: 2px;">' + r.c1Checks + '</span></td>' +
-            '<td style="text-align:center;">' + r.c2 + ' / 7<br><span style="font-size:0.8rem; letter-spacing: 2px;">' + r.c2Checks + '</span></td>' +
-            '<td style="text-align:center;">' + r.c3 + ' / 8<br><span style="font-size:0.8rem; letter-spacing: 2px;">' + r.c3Checks + '</span></td>' +
+            '<td style="text-align:center;">' + r.c1 + ' / 5<br><span style="font-size:0.9rem; letter-spacing: 2px;">' + r.c1Checks + '</span></td>' +
+            '<td style="text-align:center;">' + r.c2 + ' / 7<br><span style="font-size:0.9rem; letter-spacing: 2px;">' + r.c2Checks + '</span></td>' +
+            '<td style="text-align:center;">' + r.c3 + ' / 8<br><span style="font-size:0.9rem; letter-spacing: 2px;">' + r.c3Checks + '</span></td>' +
             '<td><span class="badge ' + badgeClass + '">' + r.notaFinal + '</span></td>' +
             '<td>' + r.wordCount + ' palabras</td>' +
             '<td>' + bibIcon + '</td>' +
@@ -665,31 +583,26 @@ function renderTable(fText) {
     });
 }
 
-// ─── Ordenamiento de tabla ───
 function setupSortableHeaders() {
     const headers = document.querySelectorAll('.results-table th.sortable');
-    headers.forEach(function(th) {
-        th.addEventListener('click', function() {
+    headers.forEach(th => {
+        th.addEventListener('click', () => {
             const col = th.dataset.sort;
-            if (sortColumn === col) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortColumn = col;
-                sortDirection = 'asc';
-            }
-            headers.forEach(function(h) { h.classList.remove('asc', 'desc'); });
+            if (sortColumn === col) sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            else { sortColumn = col; sortDirection = 'asc'; }
+            headers.forEach(h => h.classList.remove('asc', 'desc'));
             th.classList.add(sortDirection);
             renderTable(DOM['filter-input'] ? DOM['filter-input'].value : '');
         });
     });
 }
 
-// ─── Persistencia en sessionStorage ───
+// ─── PERSISTENCIA Y LIMPIEZA DE SESIÓN ───
 function saveState() {
     try {
         const state = {
             resultados: resultadosEvaluacion,
-            archivos: archivosDetectados.map(function(f) { return { name: f.name, type: f.type, size: f.size }; })
+            archivos: archivosDetectados.map(f => ({ name: f.name, type: f.type, size: f.size }))
         };
         sessionStorage.setItem('evaluador_state', JSON.stringify(state));
     } catch (e) { /* storage lleno, ignorar */ }
@@ -708,10 +621,9 @@ function loadState() {
             renderTable();
             if (DOM['status-text']) DOM['status-text'].textContent = 'Sesión restaurada: ' + resultadosEvaluacion.length + ' evaluaciones previas.';
         }
-    } catch (e) { /* ignorar */ }
+    } catch (e) {}
 }
 
-// ─── Limpieza total ───
 function clearAll() {
     if (abortController) abortController.abort();
     isProcessing = false;
@@ -731,12 +643,10 @@ function clearAll() {
     if (DOM['results-count']) DOM['results-count'].classList.add('hidden');
     
     updateFileListUI();
-    
-    // REPARACIÓN: Cierre correcto del código que quedó cortado en tu mensaje original.
     sessionStorage.removeItem('evaluador_state');
 }
 
-// ─── Event Listeners e Inicialización de Interfaz ───
+// ─── INICIALIZACIÓN Y EVENTOS DEL DOM ───
 document.addEventListener('DOMContentLoaded', () => {
     cacheDOM();
     checkDependencies();
@@ -744,55 +654,22 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSortableHeaders();
     loadState();
 
-    // Lógica Drag & Drop
     const dropZone = DOM['drop-zone'];
     if (dropZone) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
-        });
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
-        });
-        dropZone.addEventListener('drop', e => {
-            const dt = e.dataTransfer;
-            if (dt.files && dt.files.length) addFilesToList(dt.files);
-        });
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false));
+        ['dragenter', 'dragover'].forEach(evt => dropZone.addEventListener(evt, () => dropZone.classList.add('dragover'), false));
+        ['dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, () => dropZone.classList.remove('dragover'), false));
+        dropZone.addEventListener('drop', e => { if (e.dataTransfer.files.length) addFilesToList(e.dataTransfer.files); });
     }
 
-    // Lógica de Inputs de Archivos
-    if (DOM['file-input']) {
-        DOM['file-input'].addEventListener('change', function() {
-            if (this.files && this.files.length) addFilesToList(this.files);
-        });
-    }
-    if (DOM['folder-input']) {
-        DOM['folder-input'].addEventListener('change', function() {
-            if (this.files && this.files.length) addFilesToList(this.files);
-        });
-    }
-    if (DOM['btn-folder']) {
-        DOM['btn-folder'].addEventListener('click', () => {
-            if (DOM['folder-input']) DOM['folder-input'].click();
-        });
-    }
+    if (DOM['file-input']) DOM['file-input'].addEventListener('change', function() { if (this.files.length) addFilesToList(this.files); });
+    if (DOM['folder-input']) DOM['folder-input'].addEventListener('change', function() { if (this.files.length) addFilesToList(this.files); });
+    if (DOM['btn-folder']) DOM['btn-folder'].addEventListener('click', () => { if (DOM['folder-input']) DOM['folder-input'].click(); });
 
-    // Botones de acción principales
     if (DOM['btn-process']) DOM['btn-process'].addEventListener('click', processAllFiles);
     if (DOM['btn-clear']) DOM['btn-clear'].addEventListener('click', clearAll);
-    if (DOM['btn-cancel']) DOM['btn-cancel'].addEventListener('click', () => {
-        if (abortController) abortController.abort();
-    });
-    if (DOM['btn-dismiss-errors']) DOM['btn-dismiss-errors'].addEventListener('click', () => {
-        if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
-    });
+    if (DOM['btn-cancel']) DOM['btn-cancel'].addEventListener('click', () => { if (abortController) abortController.abort(); });
+    if (DOM['btn-dismiss-errors']) DOM['btn-dismiss-errors'].addEventListener('click', () => { if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden'); });
 
-    // Buscador/Filtro
-    if (DOM['filter-input']) {
-        DOM['filter-input'].addEventListener('input', function() {
-            renderTable(this.value);
-        });
-    }
+    if (DOM['filter-input']) DOM['filter-input'].addEventListener('input', function() { renderTable(this.value); });
 });
