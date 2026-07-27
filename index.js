@@ -1,10 +1,15 @@
 /* ============================================================
-   index.js — Motor de Evaluación Automatizada (Equidad Evaluativa)
+   index.js — Motor de Evaluación Automatizada con IA Integrada
    C1: Normativa - T1(Beneficios), T2(Acoso), T3(Flexibilidad)
    C2: Evidencia - Casos/Noticias de T1, T2 y T3
    C3: Reflexión - Ética, Rol RRHH, Acciones estratégicas
-   Procesamiento en Fila India con recolección de basura (RAM)
+   Procesamiento secuencial (Fila India) y limpieza de RAM
    ============================================================ */
+
+// ─── CONFIGURACIÓN DE LA IA (API) ───
+// ¡IMPORTANTE!: Coloca aquí tu clave de API real generada en Google AI Studio
+const AI_API_KEY = "TU_API_KEY_AQUI";
+const AI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AI_API_KEY}`;
 
 // ─── Verificación de Dependencias CDN ───
 const REQUIRED_LIBS = {
@@ -41,27 +46,6 @@ function configurePDFJS() {
 
 // ─── Micro-pausa para forzar redibujado de UI y liberar RAM ───
 const yieldUI = () => new Promise(resolve => setTimeout(resolve, 15));
-
-// ─── Diccionarios de Evaluación por Tema ───
-const TEMAS = {
-    beneficios: {
-        label: 'Beneficios de Ley',
-        c1: ['ley', 'norma', 'decreto', 'derecho', 'mtpe', 'artículo', 'reglamento', '29381', '27942', '28518', 'beneficio', 'remuneración', 'gratificación', 'cts', 'compensación', 'seguro', 'essalud', 'vacaciones', 'jornada', 'descanso', 'utilidades', 'asignación', 'bonificación', 'constitución', '29783', '30057', '30709', '728', 'legislativo', 'supremo', 'ds', 'd.s.'],
-        c2: ['sunafil', 'resolución', 'noticia', 'empresa', 'reportaje', 'fuente', 'http', 'https', 'caso real', 'evidencia', 'multa', 'denuncia', 'expediente', 'tribunal', 'indecopi', 'el comercio', 'rpp', 'andina', 'gob.pe', 'www.', '.pe', 'sentencia', 'fiscalización', 'inspección']
-    },
-    acoso: {
-        label: 'Acoso/Hostigamiento',
-        c1: ['acoso', 'hostigamiento', '27942', 'ley', 'norma', 'decreto', 'derecho', 'mtpe', 'artículo', 'reglamento', 'laboral', 'sanción', 'falta', 'disciplinario', 'protección', 'víctima', 'denuncia', 'procedimiento', 'constitución', '29783', '30709', 'legislativo', 'supremo', 'ds', 'd.s.'],
-        c2: ['sunafil', 'resolución', 'noticia', 'empresa', 'reportaje', 'fuente', 'http', 'https', 'caso real', 'evidencia', 'multa', 'denuncia', 'expediente', 'tribunal', 'indecopi', 'el comercio', 'rpp', 'andina', 'gob.pe', 'www.', '.pe', 'sentencia', 'fiscalización', 'inspección', 'testimonio']
-    },
-    flexibilidad: {
-        label: 'Flexibilidad Horaria',
-        c1: ['flexibilidad', 'horario', 'teletrabajo', 'remoto', 'jornada', 'conciliación', '28518', '30036', 'ley', 'norma', 'decreto', 'derecho', 'mtpe', 'artículo', 'reglamento', 'productividad', 'virtual', 'digital', 'desconexión', 'constitución', 'legislativo', 'supremo', 'ds', 'd.s.'],
-        c2: ['sunafil', 'resolución', 'noticia', 'empresa', 'reportaje', 'fuente', 'http', 'https', 'caso real', 'evidencia', 'multa', 'denuncia', 'expediente', 'tribunal', 'indecopi', 'el comercio', 'rpp', 'andina', 'gob.pe', 'www.', '.pe', 'sentencia', 'fiscalización', 'inspección', 'covid', 'pandemia', 'home office']
-    }
-};
-
-const CONECTORES = ['en primer lugar', 'a continuación', 'primero', 'para terminar', 'finalmente', 'por otra parte', 'en cuanto a', 'acerca de', 'con relación a', 'por tanto', 'por consiguiente', 'como resultado', 'por lo cual', 'de ahí que', 'sin embargo', 'no obstante', 'en cambio', 'por el contrario', 'en mi opinión', 'desde mi perspectiva', 'considero', 'es decir', 'en efecto', 'dicho de otra manera', 'en conclusión', 'en resumen'];
 
 // ─── Estado Global ───
 let resultadosEvaluacion = [];
@@ -101,228 +85,124 @@ function extractStudentIdentity(fileName, text) {
     return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
 }
 
-// ─── Detección de Subtítulos ───
-function detectSubtitles(text) {
-    const lineas = text.split(/\n/).filter(l => l.trim().length > 0);
-    let count = 0;
-    const patronesSubtitulo = [
-        /^(introducción|desarrollo|conclusión|conclusiones|anexos|bibliografía|referencias|índice|resumen|abstract)$/im,
-        /^(capítulo|tema|sección|unidad|módulo)\s*(n[°º]?\s*)?\d/i,
-        /^\d{1,2}[\.\)]\s+[A-ZÁÉÍÓÚÑ]/,
-        /^[IVX]+[\.\)]\s+[A-ZÁÉÍÓÚÑ]/,
-        /^[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{4,40}$/
-    ];
-    for (const linea of lineas) {
-        for (const p of patronesSubtitulo) {
-            if (p.test(linea.trim())) { count++; break; }
-        }
-    }
-    return { count, penaliza: count > 3 };
-}
-
-// ─── Evaluación de Bibliografía ───
-function evaluateBibliografia(text) {
-    const idxBib = text.search(/\b(bibliografía|referencias|fuentes\s+consultadas)\b/i);
-    if (idxBib === -1) return { ok: false, observacion: '❌ No se encontró sección de Bibliografía.' };
-    
-    const bloqueBib = text.substring(idxBib);
-    const enlaces = bloqueBib.match(/https?:\/\/[^\s]+/gi) || [];
-    if (enlaces.length < 3) return { ok: false, observacion: `⚠️ Solo ${enlaces.length} enlace(s). Se requieren al menos 3 fuentes.` };
-    
-    const lineas = bloqueBib.split(/\n/).filter(l => /^[a-záéíóúñ]/.test(l.trim().toLowerCase()));
-    let ordenado = true;
-    for (let i = 1; i < Math.min(lineas.length, 10); i++) {
-        if (lineas[i].trim().toLowerCase() < lineas[i-1].trim().toLowerCase()) {
-            ordenado = false; break;
-        }
-    }
-    if (!ordenado) return { ok: false, observacion: `⚠️ Bibliografía con ${enlaces.length} enlaces, pero no en orden alfabético estricto.` };
-    
-    return { ok: true, observacion: `✅ Bibliografía completa con ${enlaces.length} fuentes en orden alfabético.` };
-}
-
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE EVALUACIÓN
+// MOTOR DE EVALUACIÓN SEMÁNTICO (VÍA IA)
 // ═══════════════════════════════════════════════════════════
 
-function detectarTema(temaKey, text) {
-    const dic = TEMAS[temaKey];
-    const matches = [];
-    let score = 0;
-    for (const word of dic.c1) {
-        const regex = new RegExp('\\b' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-        const found = (text.match(regex) || []).length;
-        if (found > 0) {
-            matches.push(word);
-            score += found;
-        }
-    }
-    return { presente: matches.length >= 2, matches, score };
-}
-
-// C1: Normativa Perú
-function evaluateC1(text) {
-    const resultados = {};
-    let temasDetectados = 0;
-    const observaciones = [];
-
-    for (const [key, tema] of Object.entries(TEMAS)) {
-        const deteccion = detectarTema(key, text);
-        resultados[key] = deteccion;
-        if (deteccion.presente) temasDetectados++;
-        else observaciones.push('Falta desarrollo normativo del tema: ' + tema.label);
-    }
-
-    let puntaje = temasDetectados * 1.5;
-    const tieneLeyExplicita = /(ley\s*(n°|nº|nro|núm)?\s*\d{3,5}|decreto\s*(supremo|legislativo|de urgencia)?\s*(n°|nº|nro|núm)?\s*\d{2,5}|d\.?s\.?\s*(n°|nº|nro|núm)?\s*\d{2,5}|constitución\s*política)/gi.test(text);
-
-    if (temasDetectados === 3 && tieneLeyExplicita) {
-        puntaje = 5.0;
-        observaciones.push('✅ Plus 0.5: 3 temas con referencias normativas explícitas.');
-    } else if (temasDetectados === 3 && !tieneLeyExplicita) {
-        puntaje = 4.5;
-    }
-
-    return { puntaje: Math.min(5, puntaje), temasDetectados, detalle: resultados, observaciones };
-}
-
-// C2: Casos Reales Peruanos
-function evaluateC2(text) {
-    const resultados = {};
-    let temasConEvidencia = 0;
-    let temasConEnlace = 0;
-    const observaciones = [];
-    const enlaces = text.match(/https?:\/\/[^\s]+/gi) || [];
-
-    for (const [key, tema] of Object.entries(TEMAS)) {
-        let matchCount = 0;
-        for (const word of tema.c2) {
-            const regex = new RegExp('\\b' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-            matchCount += (text.match(regex) || []).length;
-        }
-        const presente = matchCount >= 2;
-        const tieneEnlace = enlaces.length > 0 && presente;
-        resultados[key] = { presente, matchCount, tieneEnlace };
-        if (presente) {
-            temasConEvidencia++;
-            if (tieneEnlace) temasConEnlace++;
-        } else {
-            observaciones.push('Falta evidencia de caso real para: ' + tema.label);
-        }
-    }
-
-    let puntaje = temasConEvidencia * 2.0;
-
-    if (temasConEvidencia === 3 && temasConEnlace >= 2) {
-        puntaje = 7.0;
-        observaciones.push('✅ Plus 1.0: Casos reales con enlaces verificables en temas.');
-    }
-
-    return { puntaje: Math.min(7, puntaje), temasConEvidencia, detalle: resultados, observaciones };
-}
-
-// C3: Ética y Rol de RR.HH.
-function evaluateC3(text, resultadosC1) {
-    const observaciones = [];
-    const palabras = text.split(/\s+/);
-    const puntoCorte = Math.floor(palabras.length * 0.7);
-    const bloqueReflexion = palabras.slice(puntoCorte).join(' ');
-
-    const marcadoresEtica = ['ética', 'código de ética', 'postura', 'moral', 'valores', 'principios', 'deontología', 'integridad', 'responsabilidad', 'transparencia'];
-    let scoreEtica = 0;
-    for (const m of marcadoresEtica) {
-        const regex = new RegExp('\\b' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-        scoreEtica += (bloqueReflexion.match(regex) || []).length;
-    }
-    const ptsEtica = scoreEtica >= 5 ? 2.5 : scoreEtica >= 2 ? 1.5 : scoreEtica >= 1 ? 0.8 : 0;
-    if (ptsEtica < 1.5) observaciones.push('Postura ética débil.');
-
-    const marcadoresRRHH = ['recursos humanos', 'rr.hh', 'rrhh', 'gestión humana', 'talento humano', 'área de personal', 'departamento de rrhh', 'profesional', 'liderazgo', 'cultura organizacional'];
-    let scoreRRHH = 0;
-    for (const m of marcadoresRRHH) {
-        const regex = new RegExp('\\b' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-        scoreRRHH += (bloqueReflexion.match(regex) || []).length;
-    }
-    const ptsRRHH = scoreRRHH >= 4 ? 2.5 : scoreRRHH >= 2 ? 1.5 : scoreRRHH >= 1 ? 0.8 : 0;
-    if (ptsRRHH < 1.5) observaciones.push('Falta rol del profesional de RR.HH.');
-
-    const temasDetectados = resultadosC1 ? resultadosC1.temasDetectados : 0;
-    let ptsAcciones = 0;
-    if (temasDetectados >= 1) {
-        const marcadoresAccion = ['protocolo', 'capacitación', 'prevención', 'estrategia', 'plan', 'política', 'programa', 'intervención', 'sensibilización', 'monitoreo', 'mejora', 'implementar'];
-        let scoreAccion = 0;
-        for (const m of marcadoresAccion) {
-            const regex = new RegExp('\\b' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
-            scoreAccion += (text.match(regex) || []).length;
-        }
-        ptsAcciones = Math.min(3.0, temasDetectados * 1.0);
-        if (scoreAccion < temasDetectados * 2) {
-            ptsAcciones = Math.min(3.0, Math.max(0.5, scoreAccion * 0.3));
-        }
-    }
-
-    const puntaje = Math.round((ptsEtica + ptsRRHH + ptsAcciones) * 10) / 10;
-    return { puntaje: Math.min(8, puntaje), detalle: { ptsEtica, ptsRRHH, ptsAcciones }, observaciones };
-}
-
-// Orquestador de Evaluación 
-function evaluateContent(fileName, text) {
-    const obs = [];
+/**
+ * Evaluación asistida por IA con salida en JSON estricto
+ */
+async function evaluateContentWithAI(fileName, text) {
     const wordCount = text.split(/\s+/).filter(w => w.length > 1).length;
-
-    if (wordCount < 700) obs.push('⚠️ Extensión baja (' + wordCount + ' pal).');
-    else if (wordCount < 1000) obs.push('📝 Extensión aceptable (' + wordCount + ' pal).');
-    else obs.push('✅ Extensión adecuada (' + wordCount + ' pal).');
-
-    const subtitulos = detectSubtitles(text);
-    if (subtitulos.count > 3) obs.push('❌ Subtítulos detectados (' + subtitulos.count + '). Debe ser narrativa.');
-
-    // ── C1: Normativa Perú (Checks por Tema 1, 2, 3) ──
-    const resC1 = evaluateC1(text);
-    const checksC1 = (resC1.detalle.beneficios.presente ? '✅' : '❌') + 
-                     (resC1.detalle.acoso.presente ? '✅' : '❌') + 
-                     (resC1.detalle.flexibilidad.presente ? '✅' : '❌');
-    obs.push.apply(obs, resC1.observaciones);
-
-    // ── C2: Casos Reales (Checks por Evidencia T1, T2, T3) ──
-    const resC2 = evaluateC2(text);
-    const checksC2 = (resC2.detalle.beneficios.presente ? '✅' : '❌') + 
-                     (resC2.detalle.acoso.presente ? '✅' : '❌') + 
-                     (resC2.detalle.flexibilidad.presente ? '✅' : '❌');
-    obs.push.apply(obs, resC2.observaciones);
-
-    // ── C3: Ética y RR.HH. (Checks por Ética, Postura RRHH, Acciones) ──
-    const resC3 = evaluateC3(text, resC1);
-    const checksC3 = (resC3.detalle.ptsEtica >= 0.8 ? '✅' : '❌') + 
-                     (resC3.detalle.ptsRRHH >= 0.8 ? '✅' : '❌') + 
-                     (resC3.detalle.ptsAcciones > 0 ? '✅' : '❌');
-    obs.push.apply(obs, resC3.observaciones);
-
-    // Conectores & Bibliografía
-    let conectores = 0;
-    CONECTORES.forEach(c => { if (text.includes(c)) conectores++; });
-    if (conectores < 3) obs.push('Faltan conectores lógicos.');
-
-    const resBib = evaluateBibliografia(text);
-    obs.push(resBib.observacion);
-
-    const notaFinal = Math.round((resC1.puntaje + resC2.puntaje + resC3.puntaje) * 10) / 10;
     const estudiante = extractStudentIdentity(fileName, text);
+    
+    // Validar extensión base antes de gastar recursos de API
+    if (wordCount < 100) {
+        return {
+            estudiante: estudiante, c1: 0, c1Checks: '❌ ❌ ❌', c2: 0, c2Checks: '❌ ❌ ❌', c3: 0, c3Checks: '❌ ❌ ❌',
+            notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
+            observacion: '⚠️ Texto demasiado corto o ilegible para evaluar adecuadamente.'
+        };
+    }
 
-    return {
-        estudiante: estudiante,
-        c1: resC1.puntaje,
-        c1Checks: checksC1,
-        c2: resC2.puntaje,
-        c2Checks: checksC2,
-        c3: resC3.puntaje,
-        c3Checks: checksC3,
-        notaFinal: notaFinal,
-        wordCount: wordCount,
-        conectoresHallados: conectores,
-        bibliografia: resBib,
-        observacion: obs.join(' | ')
-    };
+    const promptText = `
+    Actúa como un docente evaluador universitario riguroso. Audita el siguiente texto académico (ensayo/informe) presentado por un estudiante:
+
+    --- INICIO DEL TEXTO ---
+    ${text.substring(0, 15000)}
+    --- FIN DEL TEXTO ---
+
+    EVALÚA ESTRICTAMENTE LOS SIGUIENTES 3 CRITERIOS.
+
+    C1: NORMATIVA PERÚ (Máximo 5 puntos)
+    - Tema 1: Beneficios laborales de Ley (¿Desarrolla con sustento normativo peruano?)
+    - Tema 2: Acoso y Hostigamiento Laboral / Sexual (¿Desarrolla con sustento normativo peruano?)
+    - Tema 3: Flexibilidad Horaria para Estudiantes (¿Desarrolla con sustento normativo peruano?)
+    Puntuación C1: 1.5 pts por cada tema con sustento normativo verificado. Otorga un plus de 0.5 pts solo si los 3 temas están desarrollados y citan explícitamente leyes o decretos peruanos reales.
+
+    C2: CASOS REALES Y EVIDENCIA (Máximo 7 puntos)
+    - Caso Tema 1: ¿Presenta ejemplo o noticia real peruana sobre vulneración de Beneficios?
+    - Caso Tema 2: ¿Presenta ejemplo o noticia real peruana sobre vulneración de Acoso/Hostigamiento?
+    - Caso Tema 3: ¿Presenta ejemplo o noticia real peruana sobre vulneración de Flexibilidad?
+    Puntuación C2: 2.0 pts por cada caso real. Otorga un plus de 1.0 pt solo si los casos incluyen enlaces URL verificables.
+
+    C3: ÉTICA Y RESPONSABILIDAD PROFESIONAL EN RR.HH. (Máximo 8 puntos)
+    - Check 1: ¿Expone una postura ética personal, crítica y clara en las conclusiones? (Hasta 2.5 pts)
+    - Check 2: ¿Define claramente el rol estratégico y la responsabilidad del profesional de RR.HH.? (Hasta 2.5 pts)
+    - Check 3: ¿Propone acciones o estrategias concretas de prevención/mejora frente a la responsabilidad profesional? (Hasta 3.0 pts)
+
+    BIBLIOGRAFÍA:
+    - ¿El texto cuenta con una sección de bibliografía con enlaces válidos?
+
+    Responde ÚNICAMENTE con un objeto JSON válido, sin bloques de código markdown (\`\`\`), con esta estructura exacta:
+    {
+      "c1_puntaje": numero,
+      "c1_checks": [booleano_tema1, booleano_tema2, booleano_tema3],
+      "c2_puntaje": numero,
+      "c2_checks": [booleano_caso1, booleano_caso2, booleano_caso3],
+      "c3_puntaje": numero,
+      "c3_checks": [booleano_etica, booleano_rrhh, booleano_acciones],
+      "bibliografia_valida": booleano,
+      "observaciones": "Resumen conciso en una frase sobre las deficiencias o fortalezas encontradas."
+    }
+    `;
+
+    try {
+        const response = await fetch(AI_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: { responseMimeType: "application/json", temperature: 0.1 } // Baja temperatura para análisis estricto
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error en API HTTP: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Limpiar posible formato Markdown residual si la IA no respetó el formato estricto
+        let aiResponseText = data.candidates[0].content.parts[0].text;
+        aiResponseText = aiResponseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        
+        const resIA = JSON.parse(aiResponseText);
+
+        // Convertir booleanos a palomitas visuales
+        const checksC1 = resIA.c1_checks.map(v => v ? '✅' : '❌').join(' ');
+        const checksC2 = resIA.c2_checks.map(v => v ? '✅' : '❌').join(' ');
+        const checksC3 = resIA.c3_checks.map(v => v ? '✅' : '❌').join(' ');
+
+        const notaFinal = Math.round((resIA.c1_puntaje + resIA.c2_puntaje + resIA.c3_puntaje) * 10) / 10;
+
+        return {
+            estudiante: estudiante,
+            c1: resIA.c1_puntaje,
+            c1Checks: checksC1,
+            c2: resIA.c2_puntaje,
+            c2Checks: checksC2,
+            c3: resIA.c3_puntaje,
+            c3Checks: checksC3,
+            notaFinal: notaFinal,
+            wordCount: wordCount,
+            bibliografia: { ok: resIA.bibliografia_valida },
+            observacion: resIA.observaciones
+        };
+
+    } catch (error) {
+        console.error("Error al evaluar con la IA en archivo:", fileName, error);
+        return {
+            estudiante: estudiante,
+            c1: 0, c1Checks: '⚠️ ⚠️ ⚠️',
+            c2: 0, c2Checks: '⚠️ ⚠️ ⚠️',
+            c3: 0, c3Checks: '⚠️ ⚠️ ⚠️',
+            notaFinal: 0,
+            wordCount: wordCount,
+            bibliografia: { ok: false },
+            observacion: '❌ Error de comunicación con la API de Evaluación IA. Verifica tu API Key o conexión.'
+        };
+    }
 }
 
 // ─── LECTORES (PDF/DOCX/ZIP) OPTIMIZADOS PARA RAM ───
@@ -336,7 +216,7 @@ async function extractTextFromPDF(file) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         fullText += textContent.items.map(item => item.str).join(' ') + ' ';
-        page.cleanup(); // Liberar memoria de la página
+        page.cleanup();
 
         if (DOM['status-text']) {
             DOM['status-text'].innerHTML =
@@ -350,7 +230,7 @@ async function extractTextFromPDF(file) {
     }
     await loadingTask.destroy();
     arrayBuffer = null;
-    return fullText.toLowerCase();
+    return fullText; // Retornamos texto original para que la IA lea mayúsculas/minúsculas correctas
 }
 
 async function extractTextFromDOCX(file) {
@@ -360,7 +240,7 @@ async function extractTextFromDOCX(file) {
     }
     await yieldUI();
     let result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
-    let text = result.value.toLowerCase();
+    let text = result.value;
     arrayBuffer = null;
     result = null;
     return text;
@@ -457,9 +337,15 @@ function addError(archivo, mensaje) {
     DOM['error-list'].appendChild(li);
 }
 
-// ─── PROCESAMIENTO ESTRICTO EN FILA INDIA ───
+// ─── PROCESAMIENTO ESTRICTO EN FILA INDIA CON LLAMADA A IA ───
 async function processAllFiles() {
     if (isProcessing || archivosDetectados.length === 0) return;
+
+    // Validación temprana de API KEY
+    if(AI_API_KEY === "TU_API_KEY_AQUI") {
+        addError("SISTEMA", "Debes colocar tu API KEY en la línea 14 de index.js antes de evaluar.");
+        return;
+    }
 
     isProcessing = true;
     abortController = new AbortController();
@@ -495,6 +381,8 @@ async function processAllFiles() {
             }
 
             procesados++;
+            
+            // Reflejar avance en la UI
             if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Procesando ' + procesados + ' de ' + total;
             if (DOM['overlay-progress']) DOM['overlay-progress'].value = Math.round((procesados / total) * 100);
             if (DOM['overlay-percent']) DOM['overlay-percent'].textContent = Math.round((procesados / total) * 100) + '%';
@@ -505,15 +393,25 @@ async function processAllFiles() {
                 if (item.type === 'pdf') text = await extractTextFromPDF(item.file);
                 else if (item.type === 'docx') text = await extractTextFromDOCX(item.file);
 
-                if (!text || text.trim().length < 50) addError(item.name, 'Documento vacío o ilegible.');
-                else resultadosEvaluacion.push(evaluateContent(item.name, text));
-                text = null;
+                if (!text || text.trim().length < 50) {
+                    addError(item.name, 'Documento vacío o ilegible.');
+                } else {
+                    if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'IA Evaluando: ' + item.name + '...';
+                    
+                    // Esperamos a que la IA evalúe el documento
+                    const resultado = await evaluateContentWithAI(item.name, text);
+                    resultadosEvaluacion.push(resultado);
+                }
+                text = null; // Limpiar RAM
             } catch (err) {
                 addError(item.name, 'Error: ' + err.message);
             }
 
             item.file = null; item = null;
             await yieldUI();
+            
+            // Pequeña pausa para no saturar los límites de peticiones (Rate Limit) de la API
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     } finally {
         isProcessing = false;
@@ -528,7 +426,7 @@ async function processAllFiles() {
             renderTable();
             saveState();
         } else {
-            if (DOM['status-text']) DOM['status-text'].textContent = 'No hubo archivos válidos o proceso cancelado.';
+            if (DOM['status-text']) DOM['status-text'].textContent = 'No hubo archivos válidos o el proceso fue cancelado.';
         }
     }
 }
@@ -568,7 +466,7 @@ function renderTable(fText) {
         const bibIcon = r.bibliografia && r.bibliografia.ok ? '✅' : '❌';
         
         const tr = document.createElement('tr');
-        // Aquí se inyectan los Checks visuales (✅/❌) exactamente debajo del puntaje.
+        // Aquí se inyectan los Checks visuales (✅/❌) traídos directamente de la API de IA.
         tr.innerHTML =
             '<td>' + idx + '</td>' +
             '<td><strong>' + escapeHTML(r.estudiante) + '</strong></td>' +
