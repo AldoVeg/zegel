@@ -1,12 +1,8 @@
 /* ============================================================
-   index.js — Motor de Evaluación Automatizada con IA Integrada
-   Versión Minimalista High-Contrast: Micro-Pills de Estado,
-   Formato Ultra-Sintético de Ausencias y Rediseño Gráfico.
+   index.js — Motor de Evaluación Automatizado (Reglas Locales)
+   Versión Local Sin IA: Evaluación Heurística Ultra-Rápida,
+   Autorespuesta Concreta y Diseño Minimalista High-Contrast.
    ============================================================ */
-
-// ─── CONFIGURACIÓN DE LA IA (API) ───
-const AI_API_KEY = "TU_API_KEY_AQUI";
-const AI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AI_API_KEY}`;
 
 // ─── Verificación de Dependencias CDN ───
 const REQUIRED_LIBS = {
@@ -41,9 +37,9 @@ function configurePDFJS() {
     }
 }
 
-const yieldUI = () => new Promise(resolve => setTimeout(resolve, 20));
+const yieldUI = () => new Promise(resolve => setTimeout(resolve, 10));
 
-// ─── Estado Global (Nombres Preservados) ───
+// ─── Estado Global (Nombres Intactos) ───
 let resultadosEvaluacion = [];
 let archivosDetectados = [];
 let abortController = null;
@@ -97,12 +93,13 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE EVALUACIÓN ULTRA-CONCRETO (IA GEMINI)
+// MOTOR DE EVALUACIÓN LOCAL Y AUTORESPUESTA
 // ═══════════════════════════════════════════════════════════
 async function evaluateContentWithAI(fileName, text) {
-    const wordCount = text.split(/\s+/).filter(w => w.length > 1).length;
+    const wordCount = text ? text.split(/\s+/).filter(w => w.length > 1).length : 0;
     const estudiante = extractStudentIdentity(fileName, text);
-    
+    const lowerText = (text || '').toLowerCase();
+
     if (wordCount < 40) {
         return {
             estudiante: estudiante, 
@@ -110,104 +107,93 @@ async function evaluateContentWithAI(fileName, text) {
             c2: 0, c2Checks: [false, false, false], 
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Se emite: Ninguno | Ausenta: Documento completo | Por fortalecer: Lectura de archivo'
+            observacion: 'se emite: ninguno, ausenta: contenido mínimo procesable, postura por fortalecer: extensión del documento'
         };
     }
 
-    const promptText = `
-    Actúa como auditor académico ultra-directo. Evalúa el siguiente texto:
+    // 1. EVALUACIÓN C1: NORMATIVA PERÚ (Máx 5 pts)
+    const t1Keywords = ['cts', 'gratificac', 'vacacion', 'asignacion familiar', 'utilidad', 'sst', 'ley 29783', 'ley 728', 'beneficio', 'ley'];
+    const t2Keywords = ['acoso', 'hostigamiento', 'ley 27942', 'hostigamiento sexual', 'violencia laboral', 'denuncia'];
+    const t3Keywords = ['flexibilidad', 'horario', 'estudiante', 'ley 28518', 'practicante', 'jornada', 'estudios'];
 
-    --- INICIO TEXTO ---
-    ${text.substring(0, 16000)}
-    --- FIN TEXTO ---
+    const hasC1_T1 = t1Keywords.some(kw => lowerText.includes(kw));
+    const hasC1_T2 = t2Keywords.some(kw => lowerText.includes(kw));
+    const hasC1_T3 = t3Keywords.some(kw => lowerText.includes(kw));
 
-    EVALUACIÓN POR CHECKS GRANULARES:
+    const c1Checks = [hasC1_T1, hasC1_T2, hasC1_T3];
+    const c1Count = c1Checks.filter(Boolean).length;
+    const c1Puntos = Math.min(5, Math.round((c1Count * 1.67) * 10) / 10);
 
-    C1: NORMATIVA PERÚ (Máx 5 pts)
-    - [T1] Beneficios laborales de Ley
-    - [T2] Acoso y Hostigamiento Laboral / Sexual
-    - [T3] Flexibilidad Horaria para Estudiantes
+    // 2. EVALUACIÓN C2: CASOS REALES Y EVIDENCIA (Máx 7 pts)
+    const caseIndicators = ['caso', 'noticia', 'empresa', 'sunafil', 'sancion', 'multa', 'http', 'https', 'www', 'sentencia', 'ejemplo', 'prensa'];
+    const hasCaseContext = caseIndicators.some(kw => lowerText.includes(kw));
 
-    C2: CASOS REALES Y EVIDENCIA (Máx 7 pts)
-    - [C1] Caso/Noticia Tema 1 (Beneficios)
-    - [C2] Caso/Noticia Tema 2 (Acoso)
-    - [C3] Caso/Noticia Tema 3 (Flexibilidad)
+    const hasC2_C1 = hasC1_T1 && hasCaseContext;
+    const hasC2_C2 = hasC1_T2 && hasCaseContext;
+    const hasC2_C3 = hasC1_T3 && hasCaseContext;
 
-    C3: ÉTICA Y RESPONSABILIDAD RR.HH. (Máx 8 pts)
-    - [E1] Postura ética personal/crítica
-    - [E2] Rol explicito de RR.HH.
-    - [E3] Propuestas o soluciones concretas
+    const c2Checks = [hasC2_C1, hasC2_C2, hasC2_C3];
+    const c2Count = c2Checks.filter(Boolean).length;
+    const c2Puntos = Math.min(7, Math.round((c2Count * 2.33) * 10) / 10);
 
-    SINTESIS EXTREMA DE OBSERVACIONES:
-    Sé ultraconcreto y usa ESTRICTAMENTE este formato sin agregar introducciones ni explicaciones extra:
-    "se emite: [lista breve de lo que si hay], ausenta: [lista de lo que falta], postura por fortalecer: [un aspecto clave de C3 o ética]"
+    // 3. EVALUACIÓN C3: ÉTICA Y RESPONSABILIDAD RR.HH. (Máx 8 pts)
+    const e1Keywords = ['etica', 'ético', 'ética', 'critica', 'crítica', 'reflexion', 'reflexión', 'deber', 'moral', 'equidad'];
+    const e2Keywords = ['recursos humanos', 'rrhh', 'rr.hh', 'gestion humana', 'gestión humana', 'talento humano', 'departamento de personal'];
+    const e3Keywords = ['propuesta', 'solucion', 'solución', 'estrategia', 'plan', 'accion', 'acción', 'medida', 'recomienda'];
 
-    Responde ÚNICAMENTE con un objeto JSON:
-    {
-      "c1_puntaje": numero,
-      "c1_checks": [booleano_t1, booleano_t2, booleano_t3],
-      "c2_puntaje": numero,
-      "c2_checks": [booleano_c1, booleano_c2, booleano_c3],
-      "c3_puntaje": numero,
-      "c3_checks": [booleano_e1, booleano_e2, booleano_e3],
-      "bibliografia_valida": booleano,
-      "resumen_concreto": "se emite: ..., ausenta: ..., postura por fortalecer: ..."
-    }
-    `;
+    const hasC3_E1 = e1Keywords.some(kw => lowerText.includes(kw));
+    const hasC3_E2 = e2Keywords.some(kw => lowerText.includes(kw));
+    const hasC3_E3 = e3Keywords.some(kw => lowerText.includes(kw));
 
-    try {
-        const response = await fetch(AI_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }],
-                generationConfig: { responseMimeType: "application/json", temperature: 0.0 }
-            })
-        });
+    const c3Checks = [hasC3_E1, hasC3_E2, hasC3_E3];
+    const c3Count = c3Checks.filter(Boolean).length;
+    const c3Puntos = Math.min(8, Math.round((c3Count * 2.67) * 10) / 10);
 
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+    // 4. BIBLIOGRAFÍA
+    const bibKeywords = ['bibliografia', 'bibliografía', 'referencia', 'fuente', 'http', 'https', 'doi.org'];
+    const hasBib = bibKeywords.some(kw => lowerText.includes(kw));
 
-        const data = await response.json();
-        const aiResponseText = data.candidates[0].content.parts[0].text;
-        const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("La IA no devolvió JSON.");
-        
-        const resIA = JSON.parse(jsonMatch[0]);
+    // 5. CÁLCULO DE NOTA FINAL
+    const notaCalculada = c1Puntos + c2Puntos + c3Puntos;
+    const notaFinal = Math.min(20, Math.round(notaCalculada * 10) / 10);
 
-        const c1Puntos = Math.min(5, Math.round((resIA.c1_puntaje || 0) * 10) / 10);
-        const c2Puntos = Math.min(7, Math.round((resIA.c2_puntaje || 0) * 10) / 10);
-        const c3Puntos = Math.min(8, Math.round((resIA.c3_puntaje || 0) * 10) / 10);
+    // 6. GENERACIÓN DE AUTORESPUESTA / DIAGNÓSTICO SINTÉTICO
+    const emiteArr = [];
+    if (hasC1_T1) emiteArr.push('T1 Beneficios');
+    if (hasC1_T2) emiteArr.push('T2 Acoso');
+    if (hasC1_T3) emiteArr.push('T3 Flexibilidad');
 
-        const notaCalculada = c1Puntos + c2Puntos + c3Puntos;
-        const notaFinal = Math.min(20, Math.round(notaCalculada * 10) / 10);
+    const ausentaArr = [];
+    if (!hasC1_T1) ausentaArr.push('Normativa T1');
+    if (!hasC1_T2) ausentaArr.push('Normativa T2');
+    if (!hasC1_T3) ausentaArr.push('Normativa T3');
+    if (!hasC2_C1) ausentaArr.push('Casos T1');
+    if (!hasC2_C2) ausentaArr.push('Casos T2');
+    if (!hasC2_C3) ausentaArr.push('Casos T3');
 
-        return {
-            estudiante: estudiante,
-            c1: c1Puntos,
-            c1Checks: resIA.c1_checks || [false, false, false],
-            c2: c2Puntos,
-            c2Checks: resIA.c2_checks || [false, false, false],
-            c3: c3Puntos,
-            c3Checks: resIA.c3_checks || [false, false, false],
-            notaFinal: notaFinal,
-            wordCount: wordCount,
-            bibliografia: { ok: !!resIA.bibliografia_valida },
-            observacion: resIA.resumen_concreto || "se emite: contenido general, ausenta: especificaciones, postura por fortalecer: precisión"
-        };
+    let fortalecerStr = 'análisis crítico integral';
+    if (!hasC3_E1) fortalecerStr = 'postura ética personal';
+    else if (!hasC3_E2) fortalecerStr = 'delimitación del rol de RR.HH.';
+    else if (!hasC3_E3) fortalecerStr = 'propuestas de acción estratégicas';
 
-    } catch (error) {
-        console.error("Error API:", error);
-        return {
-            estudiante: estudiante,
-            c1: 0, c1Checks: [false, false, false],
-            c2: 0, c2Checks: [false, false, false],
-            c3: 0, c3Checks: [false, false, false],
-            notaFinal: 0,
-            wordCount: wordCount,
-            bibliografia: { ok: false },
-            observacion: 'Error en servicio de IA.'
-        };
-    }
+    const emiteStr = emiteArr.length > 0 ? emiteArr.join(', ') : 'conceptos generales';
+    const ausentaStr = ausentaArr.length > 0 ? ausentaArr.join(', ') : 'ningún requerimiento';
+
+    const observacion = `se emite: ${emiteStr}, ausenta: ${ausentaStr}, postura por fortalecer: ${fortalecerStr}`;
+
+    return {
+        estudiante: estudiante,
+        c1: c1Puntos,
+        c1Checks: c1Checks,
+        c2: c2Puntos,
+        c2Checks: c2Checks,
+        c3: c3Puntos,
+        c3Checks: c3Checks,
+        notaFinal: notaFinal,
+        wordCount: wordCount,
+        bibliografia: { ok: hasBib },
+        observacion: observacion
+    };
 }
 
 // ─── LECTORES DE ARCHIVOS ───
@@ -310,14 +296,9 @@ function addError(archivo, mensaje) {
     DOM['error-list'].appendChild(li);
 }
 
-// ─── PROCESAMIENTO EN FILA INDIA ───
+// ─── PROCESAMIENTO EN FILA INDIA (ULTRA-RÁPIDO) ───
 async function processAllFiles() {
     if (isProcessing || archivosDetectados.length === 0) return;
-
-    if(AI_API_KEY === "TU_API_KEY_AQUI" || !AI_API_KEY) {
-        alert("Configura tu API Key de Gemini en la variable AI_API_KEY.");
-        return;
-    }
 
     isProcessing = true;
     abortController = new AbortController();
@@ -367,7 +348,6 @@ async function processAllFiles() {
             }
 
             await yieldUI();
-            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     } finally {
         isProcessing = false;
@@ -383,7 +363,7 @@ async function processAllFiles() {
     }
 }
 
-// ─── COMPONENTES VISUALES MINIMALISTAS ───
+// ─── COMPONENTES VISUALES MINIMALISTAS (HIGH-CONTRAST) ───
 function renderPill(label, isOk) {
     const bg = isOk ? '#dcfce7' : '#f3f4f6';
     const color = isOk ? '#15803d' : '#9ca3af';
@@ -398,8 +378,8 @@ function renderScoreBadge(score, max) {
     if(pct >= 0.7) { color = '#10b981'; bg = '#ecfdf5'; }
     else if(pct >= 0.5) { color = '#f59e0b'; bg = '#fffbeb'; }
 
-    return `<div style="display:inline-block; text-align:center; padding:4px 8px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}33;">
-        <span style="font-size:0.95rem; font-weight:800;">${score}</span><span style="font-size:0.75rem; opacity:0.8;">/${max}</span>
+    return `<div style="display:inline-block; text-align:center; padding:3px 7px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}33;">
+        <span style="font-size:0.9rem; font-weight:800;">${score}</span><span style="font-size:0.7rem; opacity:0.8;">/${max}</span>
     </div>`;
 }
 
@@ -411,7 +391,7 @@ function renderFinalBadge(nota) {
     return `<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:${bg}; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">${nota} / 20</span>`;
 }
 
-// ─── RENDERIZADO DE TABLA (ESTILO MINIMALISTA HIGH-CONTRAST) ───
+// ─── RENDERIZADO DE TABLA ───
 function renderTable(fText) {
     fText = fText || '';
     const tbody = DOM['table-body'];
@@ -463,7 +443,7 @@ function renderTable(fText) {
             `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c2, 7)}<br><div style="margin-top:3px;">${c2Pills}</div></td>` +
             `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c3, 8)}<br><div style="margin-top:3px;">${c3Pills}</div></td>` +
             `<td style="text-align:center;">${renderFinalBadge(r.notaFinal)}</td>` +
-            `<td style="text-align:center; font-size:0.8rem; color:#4b5563;">${r.wordCount} words</td>` +
+            `<td style="text-align:center; font-size:0.8rem; color:#4b5563;">${r.wordCount} palabras</td>` +
             `<td style="text-align:center;">${bibIcon}</td>` +
             `<td style="font-size:0.8rem; color:#374151; line-height:1.3; padding: 8px;">
                 <div style="background:#f9fafb; border-left:3px solid #6366f1; padding:6px 8px; border-radius:0 4px 4px 0;">
@@ -509,7 +489,7 @@ function exportPDF() {
     const doc = new jsPDF('l', 'mm', 'a4');
 
     doc.setFontSize(14);
-    doc.text("Reporte de Evaluaciones", 14, 15);
+    doc.text("Reporte de Evaluaciones Académicas", 14, 15);
     
     let y = 25;
     doc.setFontSize(9);
