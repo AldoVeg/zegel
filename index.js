@@ -75,8 +75,11 @@ let isProcessing = false;
 // ─── Referencias al DOM ───
 const DOM = {};
 function cacheDOM() {
-    const ids = ['drop-zone', 'file-input', 'folder-input', 'btn-folder', 'folder-fallback-msg', 'file-list', 'file-list-items', 'file-count', 'stat-pdf', 'stat-docx', 'stat-zip', 'status-text', 'progress-bar', 'btn-clear', 'btn-export-pdf', 'btn-export-csv', 'error-panel', 'error-list', 'btn-dismiss-errors', 'table-body', 'filter-input', 'results-count', 'loading-overlay', 'loading-title', 'loading-detail', 'overlay-progress', 'overlay-percent', 'btn-cancel', 'cdn-alert', 'cdn-alert-text'];
-    ids.forEach(id => { DOM[id] = document.getElementById(id); });
+    const ids = ['drop-zone', 'file-input', 'folder-input', 'btn-folder', 'folder-fallback-msg', 'file-list', 'file-list-items', 'file-count', 'stat-pdf', 'stat-docx', 'stat-zip', 'status-text', 'progress-bar', 'btn-clear', 'btn-export-pdf', 'btn-export-csv', 'error-panel', 'error-list', 'btn-dismiss-errors', 'table-body', 'filter-input', 'results-count', 'loading-overlay', 'loading-title', 'loading-detail', 'overlay-progress', 'overlay-percent', 'btn-cancel', 'cdn-alert', 'cdn-alert-text', 'btn-process'];
+    ids.forEach(id => { 
+        const el = document.getElementById(id);
+        if(el) DOM[id] = el; 
+    });
 }
 
 function escapeHTML(str) { const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
@@ -314,6 +317,7 @@ function evaluateC3(text, resultadosC1) {
 
 /**
  * Evaluación consolidada: orquesta C1 + C2 + C3 + extensión + subtítulos + bibliografía
+ * (Actualizada con Checks visuales solicitados)
  */
 function evaluateContent(fileName, text) {
     const obs = [];
@@ -331,17 +335,29 @@ function evaluateContent(fileName, text) {
 
     // ── C1: Normativa Perú ──
     const resC1 = evaluateC1(text);
-    obs.push('C1: ' + resC1.puntaje + '/5 — ' + resC1.temasDetectados + '/3 temas con normativa.');
+    const checksC1 = (resC1.detalle.beneficios.presente ? '✅' : '❌') + ' ' +
+                     (resC1.detalle.acoso.presente ? '✅' : '❌') + ' ' +
+                     (resC1.detalle.flexibilidad.presente ? '✅' : '❌');
+                     
+    obs.push('C1: ' + resC1.puntaje + '/5 [' + checksC1 + '] — ' + resC1.temasDetectados + '/3 temas con normativa.');
     obs.push.apply(obs, resC1.observaciones);
 
     // ── C2: Casos Reales ──
     const resC2 = evaluateC2(text);
-    obs.push('C2: ' + resC2.puntaje + '/7 — ' + resC2.temasConEvidencia + '/3 temas con evidencia (' + resC2.totalEnlaces + ' enlaces).');
+    const checksC2 = (resC2.detalle.beneficios.presente ? '✅' : '❌') + ' ' +
+                     (resC2.detalle.acoso.presente ? '✅' : '❌') + ' ' +
+                     (resC2.detalle.flexibilidad.presente ? '✅' : '❌');
+                     
+    obs.push('C2: ' + resC2.puntaje + '/7 [' + checksC2 + '] — ' + resC2.temasConEvidencia + '/3 temas con evidencia (' + resC2.totalEnlaces + ' enlaces).');
     obs.push.apply(obs, resC2.observaciones);
 
     // ── C3: Ética y RR.HH. ──
     const resC3 = evaluateC3(text, resC1);
-    obs.push('C3: ' + resC3.puntaje + '/8 — Ética: ' + resC3.detalle.ptsEtica + ' | RRHH: ' + resC3.detalle.ptsRRHH + ' | Acciones: ' + resC3.detalle.ptsAcciones);
+    const checksC3 = (resC3.detalle.ptsEtica >= 0.8 ? '✅' : '❌') + ' ' +
+                     (resC3.detalle.ptsRRHH >= 0.8 ? '✅' : '❌') + ' ' +
+                     (resC3.detalle.ptsAcciones > 0 ? '✅' : '❌');
+                     
+    obs.push('C3: ' + resC3.puntaje + '/8 [' + checksC3 + '] — Ética: ' + resC3.detalle.ptsEtica + ' | RRHH: ' + resC3.detalle.ptsRRHH + ' | Acciones: ' + resC3.detalle.ptsAcciones);
     obs.push.apply(obs, resC3.observaciones);
 
     // ── Conectores ──
@@ -360,8 +376,11 @@ function evaluateContent(fileName, text) {
     return {
         estudiante: estudiante,
         c1: resC1.puntaje,
+        c1Checks: checksC1,
         c2: resC2.puntaje,
+        c2Checks: checksC2,
         c3: resC3.puntaje,
+        c3Checks: checksC3,
         notaFinal: notaFinal,
         wordCount: wordCount,
         conectoresHallados: conectores,
@@ -458,9 +477,9 @@ function updateFileListUI() {
         if (c > 0) { el.classList.remove('hidden'); el.textContent = el.textContent.replace(/\d+/, c); }
         else el.classList.add('hidden');
     };
-    ts(DOM['stat-pdf'], cPDF);
-    ts(DOM['stat-docx'], cDOCX);
-    ts(DOM['stat-zip'], cZIP);
+    if (DOM['stat-pdf']) ts(DOM['stat-pdf'], cPDF);
+    if (DOM['stat-docx']) ts(DOM['stat-docx'], cDOCX);
+    if (DOM['stat-zip']) ts(DOM['stat-zip'], cZIP);
 
     archivosDetectados.forEach(function(f, i) {
         const chip = document.createElement('li');
@@ -496,6 +515,7 @@ async function addFilesToList(files) {
 
 // ─── Panel de errores ───
 function addError(archivo, mensaje) {
+    if(!DOM['error-panel']) return;
     DOM['error-panel'].classList.remove('hidden');
     const li = document.createElement('li');
     li.textContent = '[' + archivo + '] ' + mensaje;
@@ -513,13 +533,16 @@ async function processAllFiles() {
 
     resultadosEvaluacion = [];
     DOM['table-body'].innerHTML = '';
-    DOM['error-list'].innerHTML = '';
-    DOM['error-panel'].classList.add('hidden');
-    DOM['progress-bar'].classList.remove('hidden');
-    DOM['progress-bar'].value = 0;
+    
+    if (DOM['error-list']) DOM['error-list'].innerHTML = '';
+    if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
+    if (DOM['progress-bar']) {
+        DOM['progress-bar'].classList.remove('hidden');
+        DOM['progress-bar'].value = 0;
+    }
 
-    DOM['loading-overlay'].classList.remove('hidden');
-    DOM['btn-cancel'].classList.remove('hidden');
+    if (DOM['loading-overlay']) DOM['loading-overlay'].classList.remove('hidden');
+    if (DOM['btn-cancel']) DOM['btn-cancel'].classList.remove('hidden');
 
     try {
         let cola = archivosDetectados.slice();
@@ -532,7 +555,7 @@ async function processAllFiles() {
             let item = cola.shift();
 
             if (item.type === 'zip') {
-                DOM['loading-detail'].textContent = 'Extrayendo ZIP: ' + item.name + '...';
+                if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Extrayendo ZIP: ' + item.name + '...';
                 try {
                     let extracted = await extractFilesFromZip(item.file);
                     for (let e = extracted.length - 1; e >= 0; e--) {
@@ -548,10 +571,10 @@ async function processAllFiles() {
             }
 
             procesados++;
-            DOM['loading-detail'].textContent = 'Procesando archivo ' + procesados + ' de ' + total;
-            DOM['overlay-progress'].value = Math.round((procesados / total) * 100);
-            DOM['overlay-percent'].textContent = Math.round((procesados / total) * 100) + '%';
-            DOM['progress-bar'].value = Math.round((procesados / total) * 100);
+            if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Procesando archivo ' + procesados + ' de ' + total;
+            if (DOM['overlay-progress']) DOM['overlay-progress'].value = Math.round((procesados / total) * 100);
+            if (DOM['overlay-percent']) DOM['overlay-percent'].textContent = Math.round((procesados / total) * 100) + '%';
+            if (DOM['progress-bar']) DOM['progress-bar'].value = Math.round((procesados / total) * 100);
 
             try {
                 let text = '';
@@ -577,14 +600,14 @@ async function processAllFiles() {
         }
     } finally {
         isProcessing = false;
-        DOM['loading-overlay'].classList.add('hidden');
-        DOM['progress-bar'].classList.add('hidden');
+        if (DOM['loading-overlay']) DOM['loading-overlay'].classList.add('hidden');
+        if (DOM['progress-bar']) DOM['progress-bar'].classList.add('hidden');
 
         if (resultadosEvaluacion.length > 0) {
             DOM['status-text'].textContent = '¡Completado! Evaluados ' + resultadosEvaluacion.length + ' de ' + archivosDetectados.length + ' archivos.';
-            DOM['btn-export-pdf'].disabled = false;
-            DOM['btn-export-csv'].disabled = false;
-            DOM['btn-clear'].disabled = false;
+            if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = false;
+            if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = false;
+            if (DOM['btn-clear']) DOM['btn-clear'].disabled = false;
             renderTable();
             saveState();
         } else {
@@ -597,6 +620,8 @@ async function processAllFiles() {
 function renderTable(fText) {
     fText = fText || '';
     const tbody = DOM['table-body'];
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     let sorted = resultadosEvaluacion.slice();
     if (sortColumn) {
@@ -612,22 +637,26 @@ function renderTable(fText) {
     let fil = fText ? sorted.filter(function(r) { return r.estudiante.toLowerCase().includes(fText.toLowerCase()); }) : sorted;
     if (fil.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="empty-msg">Sin datos.</td></tr>';
-        DOM['results-count'].classList.add('hidden');
+        if(DOM['results-count']) DOM['results-count'].classList.add('hidden');
         return;
     }
-    DOM['results-count'].classList.remove('hidden');
-    DOM['results-count'].textContent = 'Mostrando ' + fil.length + ' de ' + resultadosEvaluacion.length;
+    if (DOM['results-count']) {
+        DOM['results-count'].classList.remove('hidden');
+        DOM['results-count'].textContent = 'Mostrando ' + fil.length + ' de ' + resultadosEvaluacion.length;
+    }
+    
     fil.forEach(function(r) {
         const idx = resultadosEvaluacion.indexOf(r) + 1;
         const badgeClass = r.notaFinal >= 14 ? 'badge-success' : (r.notaFinal >= 11 ? 'badge-warning' : 'badge-danger');
         const bibIcon = r.bibliografia && r.bibliografia.ok ? '✅' : '❌';
+        
         const tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + idx + '</td>' +
             '<td><strong>' + escapeHTML(r.estudiante) + '</strong></td>' +
-            '<td>' + r.c1 + ' / 5</td>' +
-            '<td>' + r.c2 + ' / 7</td>' +
-            '<td>' + r.c3 + ' / 8</td>' +
+            '<td style="text-align:center;">' + r.c1 + ' / 5<br><span style="font-size:0.8rem; letter-spacing: 2px;">' + r.c1Checks + '</span></td>' +
+            '<td style="text-align:center;">' + r.c2 + ' / 7<br><span style="font-size:0.8rem; letter-spacing: 2px;">' + r.c2Checks + '</span></td>' +
+            '<td style="text-align:center;">' + r.c3 + ' / 8<br><span style="font-size:0.8rem; letter-spacing: 2px;">' + r.c3Checks + '</span></td>' +
             '<td><span class="badge ' + badgeClass + '">' + r.notaFinal + '</span></td>' +
             '<td>' + r.wordCount + ' palabras</td>' +
             '<td>' + bibIcon + '</td>' +
@@ -673,11 +702,11 @@ function loadState() {
         const state = JSON.parse(raw);
         if (state.resultados && state.resultados.length > 0) {
             resultadosEvaluacion = state.resultados;
-            DOM['btn-export-pdf'].disabled = false;
-            DOM['btn-export-csv'].disabled = false;
-            DOM['btn-clear'].disabled = false;
+            if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = false;
+            if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = false;
+            if (DOM['btn-clear']) DOM['btn-clear'].disabled = false;
             renderTable();
-            DOM['status-text'].textContent = 'Sesión restaurada: ' + resultadosEvaluacion.length + ' evaluaciones previas.';
+            if (DOM['status-text']) DOM['status-text'].textContent = 'Sesión restaurada: ' + resultadosEvaluacion.length + ' evaluaciones previas.';
         }
     } catch (e) { /* ignorar */ }
 }
@@ -688,220 +717,82 @@ function clearAll() {
     isProcessing = false;
     resultadosEvaluacion = [];
     archivosDetectados = [];
-    DOM['table-body'].innerHTML = '<tr><td colspan="9" class="empty-msg">Sube archivos para iniciar la evaluación.</td></tr>';
-    DOM['error-list'].innerHTML = '';
-    DOM['error-panel'].classList.add('hidden');
-    DOM['progress-bar'].classList.add('hidden');
-    DOM['btn-export-pdf'].disabled = true;
-    DOM['btn-export-csv'].disabled = true;
-    DOM['btn-clear'].disabled = true;
-    DOM['file-input'].value = '';
-    DOM['folder-input'].value = '';
-    DOM['filter-input'].value = '';
-    DOM['results-count'].classList.add('hidden');
+    
+    if (DOM['table-body']) DOM['table-body'].innerHTML = '<tr><td colspan="9" class="empty-msg">Sube archivos para iniciar la evaluación.</td></tr>';
+    if (DOM['error-list']) DOM['error-list'].innerHTML = '';
+    if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
+    if (DOM['progress-bar']) DOM['progress-bar'].classList.add('hidden');
+    if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = true;
+    if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = true;
+    if (DOM['btn-clear']) DOM['btn-clear'].disabled = true;
+    if (DOM['file-input']) DOM['file-input'].value = '';
+    if (DOM['folder-input']) DOM['folder-input'].value = '';
+    if (DOM['filter-input']) DOM['filter-input'].value = '';
+    if (DOM['results-count']) DOM['results-count'].classList.add('hidden');
+    
     updateFileListUI();
+    
+    // REPARACIÓN: Cierre correcto del código que quedó cortado en tu mensaje original.
     sessionStorage.removeItem('evaluador_state');
 }
 
-// ─── Exportación CSV ───
-function exportCSV() {
-    let csvContent = '\uFEFF'; // BOM para tildes en Excel
-    csvContent += 'Estudiante,C1 Normativa(5P),C2 Evidencias(7P),C3 Ética RRHH(8P),Nota Final,Extensión,Conectores,Bibliografía,Observaciones\n';
-    resultadosEvaluacion.forEach(function(r) {
-        csvContent += '"' + r.estudiante + '",' + r.c1 + ',' + r.c2 + ',' + r.c3 + ',' + r.notaFinal + ',' + r.wordCount + ',' + r.conectoresHallados + ',"' + (r.bibliografia && r.bibliografia.ok ? 'OK' : 'Falta') + '","' + r.observacion + '"\n';
-    });
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'Reporte_Evaluacion_RRHH.csv';
-    link.click();
-}
+// ─── Event Listeners e Inicialización de Interfaz ───
+document.addEventListener('DOMContentLoaded', () => {
+    cacheDOM();
+    checkDependencies();
+    configurePDFJS();
+    setupSortableHeaders();
+    loadState();
 
-// ─── Exportación PDF ───
-function exportPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'landscape' });
-
-    doc.setFontSize(16);
-    doc.text('Reporte Consolidado de Evaluación Académica', 14, 15);
-    doc.setFontSize(10);
-    doc.text('Programa de Gestión Humana y Derecho Laboral | Escala Vigesimal (0-20)', 14, 22);
-    doc.text('Generado: ' + new Date().toLocaleDateString('es-PE'), 14, 28);
-
-    const tableData = resultadosEvaluacion.map(function(r, i) {
-        return [
-            i + 1,
-            r.estudiante,
-            r.c1 + '/5',
-            r.c2 + '/7',
-            r.c3 + '/8',
-            r.notaFinal + '/20',
-            r.wordCount + ' pal.',
-            r.bibliografia && r.bibliografia.ok ? 'OK' : 'Falta',
-            r.observacion.substring(0, 120)
-        ];
-    });
-
-    doc.autoTable({
-        startY: 34,
-        head: [['#', 'Estudiante', 'C1 (5P)', 'C2 (7P)', 'C3 (8P)', 'Nota', 'Extensión', 'Bib.', 'Observaciones']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [0, 119, 182] },
-        styles: { fontSize: 7 },
-        columnStyles: {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 40 },
-            8: { cellWidth: 70 }
-        }
-    });
-
-    doc.save('Reporte_Consolidado_Evaluaciones.pdf');
-}
-
-// ─── Recolección de archivos desde carpetas arrastradas ───
-async function collectFilesFromDataTransfer(dataTransfer) {
-    const files = [];
-    if (dataTransfer.items && dataTransfer.items.length > 0) {
-        const entries = [];
-        for (let i = 0; i < dataTransfer.items.length; i++) {
-            const item = dataTransfer.items[i];
-            const getAsEntry = item.webkitGetAsEntry || item.getAsEntry;
-            if (getAsEntry) {
-                const entry = getAsEntry.call(item);
-                if (entry) entries.push(entry);
-            }
-        }
-        if (entries.length > 0) {
-            for (const entry of entries) {
-                await readEntry(entry, files);
-            }
-            return files;
-        }
-    }
-    return Array.from(dataTransfer.files || []);
-}
-
-async function readEntry(entry, files) {
-    if (entry.isFile) {
-        return new Promise(function(resolve) {
-            entry.file(function(file) {
-                files.push(file);
-                resolve();
-            });
+    // Lógica Drag & Drop
+    const dropZone = DOM['drop-zone'];
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
         });
-    } else if (entry.isDirectory) {
-        const reader = entry.createReader();
-        return new Promise(function(resolve) {
-            reader.readEntries(async function(entries) {
-                for (const e of entries) {
-                    await readEntry(e, files);
-                }
-                resolve();
-            });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+        dropZone.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            if (dt.files && dt.files.length) addFilesToList(dt.files);
         });
     }
-}
 
-// ─── Configuración de Eventos ───
-function setupEvents() {
-    // Drag & Drop
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(ev) {
-        DOM['drop-zone'].addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); });
-    });
-    DOM['drop-zone'].addEventListener('dragover', function() { DOM['drop-zone'].classList.add('dragover'); });
-    DOM['drop-zone'].addEventListener('dragleave', function(e) {
-        if (!DOM['drop-zone'].contains(e.relatedTarget)) {
-            DOM['drop-zone'].classList.remove('dragover');
-        }
-    });
-    DOM['drop-zone'].addEventListener('drop', async function(e) {
-        DOM['drop-zone'].classList.remove('dragover');
-        if (isProcessing) return;
-        const files = await collectFilesFromDataTransfer(e.dataTransfer);
-        await addFilesToList(files);
-        if (archivosDetectados.length > 0) processAllFiles();
-    });
-
-    // Input de archivos
-    DOM['file-input'].addEventListener('change', async function(e) {
-        let f = Array.from(e.target.files);
-        e.target.value = '';
-        if (f.length > 0) { await addFilesToList(f); processAllFiles(); }
-    });
-
-    // Input de carpeta
+    // Lógica de Inputs de Archivos
+    if (DOM['file-input']) {
+        DOM['file-input'].addEventListener('change', function() {
+            if (this.files && this.files.length) addFilesToList(this.files);
+        });
+    }
     if (DOM['folder-input']) {
-        DOM['folder-input'].addEventListener('change', async function(e) {
-            let f = Array.from(e.target.files);
-            e.target.value = '';
-            if (f.length > 0) { await addFilesToList(f); processAllFiles(); }
+        DOM['folder-input'].addEventListener('change', function() {
+            if (this.files && this.files.length) addFilesToList(this.files);
         });
     }
-
-    // Botón de carpeta
     if (DOM['btn-folder']) {
-        DOM['btn-folder'].addEventListener('click', function() {
+        DOM['btn-folder'].addEventListener('click', () => {
             if (DOM['folder-input']) DOM['folder-input'].click();
         });
     }
 
-    // Click en dropzone
-    DOM['drop-zone'].addEventListener('click', function(e) {
-        if (e.target === DOM['drop-zone'] || e.target.closest('.drop-zone-content')) {
-            DOM['file-input'].click();
-        }
-    });
-
-    // Teclado en dropzone
-    DOM['drop-zone'].addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            DOM['file-input'].click();
-        }
-    });
-
-    // Botones
-    DOM['btn-clear'].addEventListener('click', clearAll);
-    DOM['btn-cancel'].addEventListener('click', function() {
+    // Botones de acción principales
+    if (DOM['btn-process']) DOM['btn-process'].addEventListener('click', processAllFiles);
+    if (DOM['btn-clear']) DOM['btn-clear'].addEventListener('click', clearAll);
+    if (DOM['btn-cancel']) DOM['btn-cancel'].addEventListener('click', () => {
         if (abortController) abortController.abort();
-        isProcessing = false;
-        DOM['loading-overlay'].classList.add('hidden');
     });
-    DOM['btn-export-csv'].addEventListener('click', exportCSV);
-    DOM['btn-export-pdf'].addEventListener('click', exportPDF);
+    if (DOM['btn-dismiss-errors']) DOM['btn-dismiss-errors'].addEventListener('click', () => {
+        if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
+    });
 
-    // Dismiss errores
-    if (DOM['btn-dismiss-errors']) {
-        DOM['btn-dismiss-errors'].addEventListener('click', function() {
-            DOM['error-panel'].classList.add('hidden');
-            DOM['error-list'].innerHTML = '';
-        });
-    }
-
-    // Filtro
+    // Buscador/Filtro
     if (DOM['filter-input']) {
         DOM['filter-input'].addEventListener('input', function() {
             renderTable(this.value);
         });
     }
-
-    // Ordenamiento
-    setupSortableHeaders();
-}
-
-// ─── Inicialización ───
-function init() {
-    cacheDOM();
-    if (checkDependencies()) {
-        configurePDFJS();
-        setupEvents();
-        loadState();
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+});
