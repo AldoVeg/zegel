@@ -1,7 +1,7 @@
 /* ============================================================
    index.js — Motor de Evaluación Automatizada con IA Integrada
-   Versión Especificada: Checks Granulares (C1, C2, C3) y
-   Reporte Exclusivo de Ausencias por Requerimiento.
+   Versión Minimalista High-Contrast: Micro-Pills de Estado,
+   Formato Ultra-Sintético de Ausencias y Rediseño Gráfico.
    ============================================================ */
 
 // ─── CONFIGURACIÓN DE LA IA (API) ───
@@ -43,7 +43,7 @@ function configurePDFJS() {
 
 const yieldUI = () => new Promise(resolve => setTimeout(resolve, 20));
 
-// ─── Estado Global (Estructura Intacta) ───
+// ─── Estado Global (Nombres Preservados) ───
 let resultadosEvaluacion = [];
 let archivosDetectados = [];
 let abortController = null;
@@ -97,7 +97,7 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE EVALUACIÓN ESPECÍFICO (IA GEMINI)
+// MOTOR DE EVALUACIÓN ULTRA-CONCRETO (IA GEMINI)
 // ═══════════════════════════════════════════════════════════
 async function evaluateContentWithAI(fileName, text) {
     const wordCount = text.split(/\s+/).filter(w => w.length > 1).length;
@@ -106,52 +106,43 @@ async function evaluateContentWithAI(fileName, text) {
     if (wordCount < 40) {
         return {
             estudiante: estudiante, 
-            c1: 0, c1Checks: '❌ ❌ ❌', 
-            c2: 0, c2Checks: '❌ ❌ ❌', 
-            c3: 0, c3Checks: '❌ ❌ ❌',
+            c1: 0, c1Checks: [false, false, false], 
+            c2: 0, c2Checks: [false, false, false], 
+            c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Ausencia total de contenido: Documento sin texto procesable.'
+            observacion: 'Se emite: Ninguno | Ausenta: Documento completo | Por fortalecer: Lectura de archivo'
         };
     }
 
     const promptText = `
-    Actúa como un evaluador académico riguroso. Audita el siguiente texto:
+    Actúa como auditor académico ultra-directo. Evalúa el siguiente texto:
 
-    --- INICIO DEL TEXTO DEL ESTUDIANTE ---
+    --- INICIO TEXTO ---
     ${text.substring(0, 16000)}
-    --- FIN DEL TEXTO ---
+    --- FIN TEXTO ---
 
-    REGLAS DE EVALUACIÓN Y VALIDACIÓN POR CHECKS:
+    EVALUACIÓN POR CHECKS GRANULARES:
 
-    C1: NORMATIVA PERÚ (Máximo 5 Puntos)
-    Evalúa la presencia de base legal/normativa peruana para los siguientes 3 temas:
-    - Check 1 (Tema 1): Beneficios laborales de Ley (CTS, Gratificaciones, Vacaciones, Asignación Familiar, Utilidades, SST, etc.).
-    - Check 2 (Tema 2): Acoso y Hostigamiento Laboral / Sexual.
-    - Check 3 (Tema 3): Flexibilidad Horaria para Estudiantes (Ley 28518 o similares).
-    Puntaje C1: Asigna proporcionalmente hasta 5.0 puntos considerando cuáles de los 3 temas cuentan con sustento normativo peruano.
+    C1: NORMATIVA PERÚ (Máx 5 pts)
+    - [T1] Beneficios laborales de Ley
+    - [T2] Acoso y Hostigamiento Laboral / Sexual
+    - [T3] Flexibilidad Horaria para Estudiantes
 
-    C2: CASOS REALES Y EVIDENCIA (Máximo 7 Puntos)
-    Evalúa la presencia de casuística, casos reales o noticias para los 3 temas:
-    - Check 1 (Caso Tema 1): Presenta noticia/caso real de Beneficios laborales (ej. Caso Ripley).
-    - Check 2 (Caso Tema 2): Presenta noticia/caso real de Acoso / Hostigamiento Laboral.
-    - Check 3 (Caso Tema 3): Presenta noticia/caso real de Flexibilidad Horaria (ej. Arcos Dorados, encuestas de empleo).
-    Puntaje C2: Asigna proporcionalmente hasta 7.0 puntos según la cantidad de temas respaldados con evidencias o casos reales.
+    C2: CASOS REALES Y EVIDENCIA (Máx 7 pts)
+    - [C1] Caso/Noticia Tema 1 (Beneficios)
+    - [C2] Caso/Noticia Tema 2 (Acoso)
+    - [C3] Caso/Noticia Tema 3 (Flexibilidad)
 
-    C3: ÉTICA Y RESPONSABILIDAD EN RR.HH. (Máximo 8 Puntos)
-    Evalúa las reflexiones del estudiante enfocadas en Recursos Humanos:
-    - Check 1 (Postura Ética): Postura ética personal y crítica frente a las situaciones expuestas.
-    - Check 2 (Rol de RR.HH.): Definición explícita de RR.HH. como rol protector/estratégico dentro de la organización.
-    - Check 3 (Propuestas/Acciones): Planteamiento de acciones o soluciones concretas frente a los problemas planteados.
-    Puntaje C3: Asigna proporcionalmente hasta 8.0 puntos según el desarrollo de estos 3 aspectos.
+    C3: ÉTICA Y RESPONSABILIDAD RR.HH. (Máx 8 pts)
+    - [E1] Postura ética personal/crítica
+    - [E2] Rol explicito de RR.HH.
+    - [E3] Propuestas o soluciones concretas
 
-    BIBLIOGRAFÍA:
-    - Evaluará true solo si se incluyen enlaces o referencias bibliográficas explícitas en el texto.
+    SINTESIS EXTREMA DE OBSERVACIONES:
+    Sé ultraconcreto y usa ESTRICTAMENTE este formato sin agregar introducciones ni explicaciones extra:
+    "se emite: [lista breve de lo que si hay], ausenta: [lista de lo que falta], postura por fortalecer: [un aspecto clave de C3 o ética]"
 
-    OBSERVACIONES (REPORTE ÚNICO DE AUSENCIAS):
-    NO incluyas sugerencias de redacción, ni comentarios generales ni consejos. 
-    En "ausencias", enumera ÚNICAMENTE qué requerimientos específicos no se encontraron en el texto (Ejemplo: "Ausencias: Tema 2 (Acoso y Hostigamiento Laboral), Caso Tema 2"). Si no falta ningún requerimiento, responde: "Completo sin ausencias".
-
-    Responde ÚNICAMENTE con un JSON válido con la siguiente estructura:
+    Responde ÚNICAMENTE con un objeto JSON:
     {
       "c1_puntaje": numero,
       "c1_checks": [booleano_t1, booleano_t2, booleano_t3],
@@ -160,7 +151,7 @@ async function evaluateContentWithAI(fileName, text) {
       "c3_puntaje": numero,
       "c3_checks": [booleano_e1, booleano_e2, booleano_e3],
       "bibliografia_valida": booleano,
-      "ausencias": "Texto enumerando únicamente los elementos ausentes"
+      "resumen_concreto": "se emite: ..., ausenta: ..., postura por fortalecer: ..."
     }
     `;
 
@@ -177,21 +168,11 @@ async function evaluateContentWithAI(fileName, text) {
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
 
         const data = await response.json();
-        
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-            throw new Error("Respuesta de la IA bloqueada o no válida.");
-        }
-
         const aiResponseText = data.candidates[0].content.parts[0].text;
         const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("La IA no devolvió el formato JSON esperado.");
+        if (!jsonMatch) throw new Error("La IA no devolvió JSON.");
         
         const resIA = JSON.parse(jsonMatch[0]);
-
-        // Formateo de los booleanos a símbolos visuales (Checks / Cruces)
-        const checksC1 = (resIA.c1_checks || [false, false, false]).map(v => v ? '✅' : '❌').join(' ');
-        const checksC2 = (resIA.c2_checks || [false, false, false]).map(v => v ? '✅' : '❌').join(' ');
-        const checksC3 = (resIA.c3_checks || [false, false, false]).map(v => v ? '✅' : '❌').join(' ');
 
         const c1Puntos = Math.min(5, Math.round((resIA.c1_puntaje || 0) * 10) / 10);
         const c2Puntos = Math.min(7, Math.round((resIA.c2_puntaje || 0) * 10) / 10);
@@ -203,33 +184,33 @@ async function evaluateContentWithAI(fileName, text) {
         return {
             estudiante: estudiante,
             c1: c1Puntos,
-            c1Checks: checksC1,
+            c1Checks: resIA.c1_checks || [false, false, false],
             c2: c2Puntos,
-            c2Checks: checksC2,
+            c2Checks: resIA.c2_checks || [false, false, false],
             c3: c3Puntos,
-            c3Checks: checksC3,
+            c3Checks: resIA.c3_checks || [false, false, false],
             notaFinal: notaFinal,
             wordCount: wordCount,
             bibliografia: { ok: !!resIA.bibliografia_valida },
-            observacion: resIA.ausencias || "Sin ausencias detectadas."
+            observacion: resIA.resumen_concreto || "se emite: contenido general, ausenta: especificaciones, postura por fortalecer: precisión"
         };
 
     } catch (error) {
-        console.error("Error en la llamada a la API:", error);
+        console.error("Error API:", error);
         return {
             estudiante: estudiante,
-            c1: 0, c1Checks: '❌ ❌ ❌',
-            c2: 0, c2Checks: '❌ ❌ ❌',
-            c3: 0, c3Checks: '❌ ❌ ❌',
+            c1: 0, c1Checks: [false, false, false],
+            c2: 0, c2Checks: [false, false, false],
+            c3: 0, c3Checks: [false, false, false],
             notaFinal: 0,
             wordCount: wordCount,
             bibliografia: { ok: false },
-            observacion: '❌ Error de lectura en la API. Revisa tu clave de API.'
+            observacion: 'Error en servicio de IA.'
         };
     }
 }
 
-// ─── LECTORES DE ARCHIVOS (PDF/DOCX/ZIP) ───
+// ─── LECTORES DE ARCHIVOS ───
 async function extractTextFromPDF(file) {
     let arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -334,7 +315,7 @@ async function processAllFiles() {
     if (isProcessing || archivosDetectados.length === 0) return;
 
     if(AI_API_KEY === "TU_API_KEY_AQUI" || !AI_API_KEY) {
-        alert("Configura tu API Key de Gemini en la variable AI_API_KEY en la línea 8.");
+        alert("Configura tu API Key de Gemini en la variable AI_API_KEY.");
         return;
     }
 
@@ -402,7 +383,35 @@ async function processAllFiles() {
     }
 }
 
-// ─── RENDERIZADO DE TABLA (PUNTAJE + CHECKS + AUSENCIAS) ───
+// ─── COMPONENTES VISUALES MINIMALISTAS ───
+function renderPill(label, isOk) {
+    const bg = isOk ? '#dcfce7' : '#f3f4f6';
+    const color = isOk ? '#15803d' : '#9ca3af';
+    const border = isOk ? '1px solid #86efac' : '1px solid #e5e7eb';
+    return `<span style="display:inline-block; padding:2px 5px; margin:1px; font-size:0.7rem; font-weight:700; border-radius:4px; background:${bg}; color:${color}; border:${border};">${label}</span>`;
+}
+
+function renderScoreBadge(score, max) {
+    let color = '#ef4444'; 
+    let bg = '#fef2f2';
+    const pct = score / max;
+    if(pct >= 0.7) { color = '#10b981'; bg = '#ecfdf5'; }
+    else if(pct >= 0.5) { color = '#f59e0b'; bg = '#fffbeb'; }
+
+    return `<div style="display:inline-block; text-align:center; padding:4px 8px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}33;">
+        <span style="font-size:0.95rem; font-weight:800;">${score}</span><span style="font-size:0.75rem; opacity:0.8;">/${max}</span>
+    </div>`;
+}
+
+function renderFinalBadge(nota) {
+    let bg = '#10b981';
+    if (nota < 11) bg = '#ef4444';
+    else if (nota < 14) bg = '#f59e0b';
+
+    return `<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:${bg}; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">${nota} / 20</span>`;
+}
+
+// ─── RENDERIZADO DE TABLA (ESTILO MINIMALISTA HIGH-CONTRAST) ───
 function renderTable(fText) {
     fText = fText || '';
     const tbody = DOM['table-body'];
@@ -436,22 +445,31 @@ function renderTable(fText) {
     }
     
     fil.forEach((r, idx) => {
-        const badgeClass = r.notaFinal >= 14 ? 'badge-success' : (r.notaFinal >= 11 ? 'badge-warning' : 'badge-danger');
-        const bibIcon = r.bibliografia && r.bibliografia.ok ? '✅ Válida' : '❌ Ausente';
+        const bibIcon = r.bibliografia && r.bibliografia.ok 
+            ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ Válida</span>' 
+            : '<span style="color:#9ca3af; font-weight:500; font-size:0.8rem;">✕ Ausente</span>';
         
+        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]);
+        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]);
+        const c3Pills = renderPill('E1', r.c3Checks[0]) + renderPill('E2', r.c3Checks[1]) + renderPill('E3', r.c3Checks[2]);
+
         const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #f3f4f6';
         
-        // Celdas perfectamente alineadas con los 9 encabezados de la tabla
         tr.innerHTML =
-            `<td>${idx + 1}</td>` +
-            `<td><strong>${escapeHTML(r.estudiante)}</strong></td>` +
-            `<td style="text-align:center;"><strong>${r.c1} / 5</strong><br><span style="font-size:0.95rem; letter-spacing: 2px;">${r.c1Checks}</span></td>` +
-            `<td style="text-align:center;"><strong>${r.c2} / 7</strong><br><span style="font-size:0.95rem; letter-spacing: 2px;">${r.c2Checks}</span></td>` +
-            `<td style="text-align:center;"><strong>${r.c3} / 8</strong><br><span style="font-size:0.95rem; letter-spacing: 2px;">${r.c3Checks}</span></td>` +
-            `<td style="text-align:center;"><span class="badge ${badgeClass}">${r.notaFinal} / 20</span></td>` +
-            `<td style="text-align:center;">${r.wordCount} palabras</td>` +
+            `<td style="text-align:center; font-weight:600; color:#6b7280; font-size:0.85rem;">${idx + 1}</td>` +
+            `<td style="font-weight:600; color:#111827; font-size:0.85rem;">${escapeHTML(r.estudiante)}</td>` +
+            `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c1, 5)}<br><div style="margin-top:3px;">${c1Pills}</div></td>` +
+            `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c2, 7)}<br><div style="margin-top:3px;">${c2Pills}</div></td>` +
+            `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c3, 8)}<br><div style="margin-top:3px;">${c3Pills}</div></td>` +
+            `<td style="text-align:center;">${renderFinalBadge(r.notaFinal)}</td>` +
+            `<td style="text-align:center; font-size:0.8rem; color:#4b5563;">${r.wordCount} words</td>` +
             `<td style="text-align:center;">${bibIcon}</td>` +
-            `<td style="font-size:0.85rem; color: #b91c1c;">${escapeHTML(r.observacion)}</td>`;
+            `<td style="font-size:0.8rem; color:#374151; line-height:1.3; padding: 8px;">
+                <div style="background:#f9fafb; border-left:3px solid #6366f1; padding:6px 8px; border-radius:0 4px 4px 0;">
+                   ${escapeHTML(r.observacion)}
+                </div>
+            </td>`;
             
         tbody.appendChild(tr);
     });
@@ -474,9 +492,9 @@ function setupSortableHeaders() {
 // ─── EXPORTACIONES ───
 function exportCSV() {
     if (resultadosEvaluacion.length === 0) return;
-    let csv = 'Estudiante,C1 Normativa,C1 Checks,C2 Evidencia,C2 Checks,C3 Etica,C3 Checks,Nota Final,Palabras,Bibliografia,Ausencias Detectadas\n';
+    let csv = 'Estudiante,C1,C2,C3,Nota Final,Palabras,Bibliografia,Resumen Concreto\n';
     resultadosEvaluacion.forEach(r => {
-        csv += `"${r.estudiante}",${r.c1},"${r.c1Checks}",${r.c2},"${r.c2Checks}",${r.c3},"${r.c3Checks}",${r.notaFinal},${r.wordCount},"${r.bibliografia.ok ? 'SI' : 'NO'}","${r.observacion.replace(/"/g, '""')}"\n`;
+        csv += `"${r.estudiante}",${r.c1},${r.c2},${r.c3},${r.notaFinal},${r.wordCount},"${r.bibliografia.ok ? 'SI' : 'NO'}","${r.observacion.replace(/"/g, '""')}"\n`;
     });
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -490,30 +508,30 @@ function exportPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a4');
 
-    doc.setFontSize(16);
-    doc.text("Consolidado de Evaluaciones Académicas", 14, 15);
+    doc.setFontSize(14);
+    doc.text("Reporte de Evaluaciones", 14, 15);
     
     let y = 25;
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text("#", 14, y);
     doc.text("Estudiante", 25, y);
-    doc.text("C1 (5P)", 85, y);
-    doc.text("C2 (7P)", 110, y);
-    doc.text("C3 (8P)", 135, y);
-    doc.text("Nota", 160, y);
-    doc.text("Ausencias / Faltantes", 185, y);
+    doc.text("C1", 85, y);
+    doc.text("C2", 105, y);
+    doc.text("C3", 125, y);
+    doc.text("Nota", 145, y);
+    doc.text("Diagnóstico Concreto", 165, y);
     doc.line(14, y + 2, 280, y + 2);
 
     y += 8;
     resultadosEvaluacion.forEach((r, idx) => {
         if (y > 180) { doc.addPage(); y = 20; }
         doc.text(String(idx + 1), 14, y);
-        doc.text(String(r.estudiante).substring(0, 28), 25, y);
-        doc.text(`${r.c1} (${r.c1Checks})`, 85, y);
-        doc.text(`${r.c2} (${r.c2Checks})`, 110, y);
-        doc.text(`${r.c3} (${r.c3Checks})`, 135, y);
-        doc.text(String(r.notaFinal), 160, y);
-        doc.text(String(r.observacion).substring(0, 45), 185, y);
+        doc.text(String(r.estudiante).substring(0, 25), 25, y);
+        doc.text(String(r.c1), 85, y);
+        doc.text(String(r.c2), 105, y);
+        doc.text(String(r.c3), 125, y);
+        doc.text(String(r.notaFinal), 145, y);
+        doc.text(String(r.observacion).substring(0, 55), 165, y);
         y += 7;
     });
 
