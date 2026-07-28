@@ -1,6 +1,6 @@
 /* ============================================================
-   index.js — Motor de Evaluación Heurístico Determinista v3.0
-   Arquitectura 6-6-8. Radares Ponderados Anti-Falsos Positivos.
+   index.js — Motor de Evaluación Heurístico Determinista v4.0
+   Arquitectura 6-6-8. CANDADOS ESTRICTOS (Cero Falsos Positivos)
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -29,10 +29,10 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
 }
 
-// Normalizador avanzado: Quita acentos, pasa a minúsculas y estandariza espacios
+// Normalizador Estricto: Quita acentos, puntuaciones (para igualar d.l. y dl) y homogeniza espacios
 function normalizeText(text) {
     if (!text) return '';
-    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, ' ');
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, ' ');
 }
 
 function detectFileType(file) {
@@ -70,20 +70,11 @@ function extractStudentIdentity(fileName, text) {
     return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
 }
 
-// Función evaluadora de temas con pesos (Evita el caso Andrea Bardales)
-function evalTheme(normText, highArr, medArr, lowArr) {
-    let score = 0;
-    highArr.forEach(kw => { if (normText.includes(kw)) score += 2.0; });
-    medArr.forEach(kw => { if (normText.includes(kw)) score += 1.0; });
-    lowArr.forEach(kw => { if (normText.includes(kw)) score += 0.5; });
-    return score >= 1.5; // Umbral exigente: Requiere un match alto, o 2 medios.
-}
-
 // ═══════════════════════════════════════════════════════════
-// MOTOR EXPERTO DE EVALUACIÓN (6-6-8) Y RADARES PONDERADOS
+// MOTOR ESTRICTO: CANDADOS LEGALES (Cero ambigüedad)
 // ═══════════════════════════════════════════════════════════
 function evaluateContent(fileName, text) {
-    // FIX CONTEO DE PALABRAS: Iguala a MS Word. Cuenta todo lo que sea alfanumérico.
+    // Conteo de palabras exacto MS Word (solo alfanuméricos)
     const wordCount = text ? text.trim().split(/\s+/).filter(w => w.match(/[a-z0-9]/i)).length : 0;
     
     const estudiante = extractStudentIdentity(fileName, text);
@@ -100,30 +91,32 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // 1. C1: NORMATIVA (Radar Ponderado anti-falsos positivos)
-    // T1: Beneficios
-    const t1High = ['27735', '26790', '650', '713', '854'];
-    const t1Med  = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'utilidades'];
-    const t1Low  = ['cts', 'gratificacion', 'vacaciones', 'mype', 'beneficios'];
-    const hasT1 = evalTheme(normText, t1High, t1Med, t1Low);
+    // 1. C1: NORMATIVA (Candados Estrictos: Ley explícita o mínimo 2 términos compuestos)
+    
+    // Candado T1: Beneficios
+    const hasT1_Law = /(ley 27735|ley 25129|ley 26790|ley 30056|dl 650|d l 650|dl 713|d l 713|dl 892|d l 892|dl 688|d l 688|dl 854|d l 854|decreto legislativo 650|decreto legislativo 713|decreto legislativo 892|decreto legislativo 688|decreto legislativo 854)/.test(normText);
+    const t1Compounds = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'participacion de utilidades', 'beneficios laborales', 'beneficios sociales'];
+    const hasT1_Comp = t1Compounds.filter(kw => normText.includes(kw)).length >= 2;
+    const hasT1 = hasT1_Law || hasT1_Comp;
 
-    // T2: Acoso
-    const t2High = ['27942', '1410', '014-2019'];
-    const t2Med  = ['hostigamiento sexual', 'comite de intervencion'];
-    const t2Low  = ['acoso', 'violencia sexual'];
-    const hasT2 = evalTheme(normText, t2High, t2Med, t2Low);
+    // Candado T2: Acoso
+    const hasT2_Law = /(ley 27942|dl 1410|d l 1410|decreto legislativo 1410|ds 014 2019|d s 014 2019|decreto supremo 014 2019)/.test(normText);
+    const t2Compounds = ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'violencia sexual'];
+    const hasT2_Comp = t2Compounds.filter(kw => normText.includes(kw)).length >= 2;
+    const hasT2 = hasT2_Law || hasT2_Comp;
 
-    // T3: Flexibilidad
-    const t3High = ['28518', '011-2012'];
-    const t3Med  = ['modalidad formativa', 'facilidades horarias', 'adaptar la jornada'];
-    const t3Low  = ['flexibilidad', 'horario', 'estudiante', 'jornada']; // Estudiante pesa poco
-    const hasT3 = evalTheme(normText, t3High, t3Med, t3Low);
+    // Candado T3: Flexibilidad (Adiós al bug "Andrea Bardales")
+    const hasT3_Law = /(ley 28518|ds 011 2012|d s 011 2012|decreto supremo 011 2012)/.test(normText);
+    const t3Compounds = ['modalidad formativa', 'modalidades formativas', 'facilidades horarias', 'flexibilidad horaria', 'adaptar la jornada'];
+    const hasT3_Comp = t3Compounds.filter(kw => normText.includes(kw)).length >= 1; // Basta 1 compuesto fuerte
+    const hasT3 = hasT3_Law || hasT3_Comp;
 
     const c1Checks = [hasT1, hasT2, hasT3];
     const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
     // 2. C2: CASOS REALES Y EVIDENCIA 
-    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'equidad.pe'];
+    // Para que el caso sea válido, TIENE que haber desbloqueado el tema (Efecto Dominó)
+    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'equidad pe'];
     const hasCaseContext = caseKw.some(kw => normText.includes(kw));
 
     const hasC1_Case = hasT1 && hasCaseContext;
@@ -148,7 +141,7 @@ function evaluateContent(fileName, text) {
 
     if (p3Hits > 0) {
         c3Puntos = 0; 
-        stanceMsg = 'Postura Deficiente/Justificadora (normaliza malas prácticas)';
+        stanceMsg = 'Postura Deficiente (justifica o normaliza malas prácticas)';
         c3Checks = [true, false, false];
     } else if (p1Hits > 0) {
         c3Puntos = 8; 
@@ -165,12 +158,16 @@ function evaluateContent(fileName, text) {
 
     // 4. RADARES ADICIONALES
     let fortalezasExtra = [];
-    const hasAPA = /\(\d{4}\).{0,60}?(recuperado|http|www|ley|resolucion|diario)/i.test(normText);
+    
+    // APA (Busca un año entre paréntesis cercano a términos de referencias)
+    const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario)/i.test(normText);
     if (!hasAPA) fortalezasExtra.push('Formato APA en bibliografía');
 
+    // Conectores (Min 3 para redacción fluida)
     const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
-    if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos de causa/efecto');
+    if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos (causa/efecto)');
 
+    // Anti-Subtítulos forzados
     const subtitulosProhibidos = ['tema 1', 'parte 1', 'parte 2', 'reflexion final', 'tema 2', 'tema 3'];
     if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa sin subtítulos');
 
@@ -392,7 +389,7 @@ function addFilesToList(files) {
     
     if (addedAny) {
         updateFileListUI();
-        processAllFiles();
+        processAllFiles(); 
     }
 }
 
