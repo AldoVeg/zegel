@@ -16,7 +16,7 @@
     <header class="app-header">
         <div class="header-container">
             <h1>📋 Sistema de Evaluación Automática de Ensayos</h1>
-            <p>Auditoría determinista basada en norma laboral peruana, evidencias y ética de RR.HH.</p>
+            <p>Auditoría determinista local: Normativa, Evidencias y Ética de RR.HH.</p>
         </div>
     </header>
 
@@ -30,8 +30,8 @@
             <div id="drop-zone" class="drop-zone">
                 <div class="drop-zone-content">
                     <div class="upload-icon">📁</div>
-                    <h3>Arrastra y suelta aquí la carpeta o archivos de los estudiantes</h3>
-                    <p>Soporta carpetas completas, archivos individuales <strong>.PDF</strong>, <strong>.DOCX</strong> o comprimidos <strong>.ZIP</strong></p>
+                    <h3>Arrastra y suelta aquí la carpeta o archivos</h3>
+                    <p>Soporta carpetas completas, archivos individuales <strong>.PDF</strong>, <strong>.DOCX</strong> o <strong>.ZIP</strong></p>
                     
                     <div class="button-group">
                         <label class="btn btn-primary">
@@ -48,7 +48,7 @@
 
             <div id="file-list" class="file-list-container hidden">
                 <div class="file-list-header">
-                    <h4>Archivos listos para evaluar (<span id="file-count">0</span>)</h4>
+                    <h4>Archivos en cola (<span id="file-count">0</span>)</h4>
                     <button id="btn-clear" class="btn btn-small btn-danger">Limpiar todo</button>
                 </div>
                 <ul id="file-list-items" class="file-chips-grid"></ul>
@@ -65,15 +65,15 @@
 
         <section class="results-card">
             <div class="results-header">
-                <div>
-                    <h2>📊 Consolidado General de Evaluaciones</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2>📊 Consolidado General</h2>
                     <span id="results-count" class="badge-info hidden">Mostrando 0 resultados</span>
                 </div>
                 
                 <div class="action-tools">
                     <input type="text" id="filter-input" placeholder="🔍 Buscar estudiante..." class="search-input">
-                    <button id="btn-export-csv" class="btn btn-success" disabled>📥 Exportar Excel (CSV)</button>
-                    <button id="btn-export-pdf" class="btn btn-dark" disabled>📄 Exportar PDF</button>
+                    <button id="btn-export-csv" class="btn btn-success" disabled>📥 Excel (CSV)</button>
+                    <button id="btn-export-pdf" class="btn btn-dark" disabled>📄 PDF</button>
                 </div>
             </div>
 
@@ -85,7 +85,7 @@
                             <th class="sortable" data-sort="estudiante">Estudiante</th>
                             <th class="sortable" data-sort="c1" style="text-align: center;">C1: Normativa (5P)</th>
                             <th class="sortable" data-sort="c2" style="text-align: center;">C2: Evidencias (7P)</th>
-                            <th class="sortable" data-sort="c3" style="text-align: center;">C3: Ética/RRHH (8P)</th>
+                            <th class="sortable" data-sort="c3" style="text-align: center;">C3: Ética (8P)</th>
                             <th class="sortable" data-sort="notaFinal" style="text-align: center;">Nota Final</th>
                             <th style="text-align: center;">Extensión</th>
                             <th style="text-align: center;">Fuentes</th>
@@ -107,7 +107,7 @@
         <div class="loader-card">
             <div class="spinner"></div>
             <h3 id="loading-title">Evaluando documentos...</h3>
-            <p id="loading-detail">Extrayendo texto y verificando patrones legales...</p>
+            <p id="loading-detail">Extrayendo texto y analizando patrones...</p>
             <progress id="overlay-progress" value="0" max="100"></progress>
             <span id="overlay-percent">0%</span>
             <br>
