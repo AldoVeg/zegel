@@ -1,7 +1,7 @@
 /* ============================================================
-   index.js — Motor de Evaluación Automatizado (Reglas Locales)
-   Versión Local Sin IA: Evaluación Heurística Ultra-Rápida,
-   Autorespuesta Concreta y Diseño Minimalista High-Contrast.
+   index.js — Motor de Evaluación Heurístico y Determinista
+   Evaluación por Presencia / Omisión de Patrones
+   Sin dependencias de IA externa, sin latencia y 100% local.
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -39,7 +39,7 @@ function configurePDFJS() {
 
 const yieldUI = () => new Promise(resolve => setTimeout(resolve, 10));
 
-// ─── Estado Global (Nombres Intactos) ───
+// ─── Estado Global (Estructura Intacta) ───
 let resultadosEvaluacion = [];
 let archivosDetectados = [];
 let abortController = null;
@@ -61,7 +61,7 @@ function escapeHTML(str) { if(!str) return ''; const div = document.createElemen
 function getFileTypeIcon(type) { if (type === 'pdf') return '📄'; if (type === 'docx') return '📝'; if (type === 'zip') return '📦'; return '📎'; }
 function detectFileType(file) { const name = file.name.toLowerCase(); if (name.endsWith('.pdf')) return 'pdf'; if (name.endsWith('.docx')) return 'docx'; if (name.endsWith('.zip')) return 'zip'; return 'other'; }
 
-// ─── EXTRACCIÓN DE IDENTIDAD ───
+// ─── EXTRACCIÓN DE NOMBRE DEL ESTUDIANTE ───
 function extractStudentIdentity(fileName, text) {
     if (!text) return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
 
@@ -77,14 +77,9 @@ function extractStudentIdentity(fileName, text) {
     }
 
     const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-    const tailLines = lines.slice(-6);
-
-    for (const line of tailLines) {
-        const matchFinal = line.match(/^([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{5,50})(?:,\s*|\s+)([A-Z0-9]{5,12})$/i);
-        if (matchFinal) {
-            return matchFinal[1].trim() + ' (' + matchFinal[2].trim() + ')';
-        }
-        if (/^[A-ZÁÉÍÓÚÑ\s]{6,60}$/.test(line) && line.split(/\s+/).length >= 2) {
+    const firstLines = lines.slice(0, 5);
+    for (const line of firstLines) {
+        if (/^[A-ZÁÉÍÓÚÑa-záéíóúñ\s,]{6,60}$/.test(line) && line.split(/\s+/).length >= 2 && !line.toLowerCase().includes('tema') && !line.toLowerCase().includes('decreto')) {
             return line.trim();
         }
     }
@@ -93,7 +88,7 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE EVALUACIÓN LOCAL Y AUTORESPUESTA
+// MOTOR DE REGLAS Y COINCIDENCIAS LOCALE (DETERMINISTA)
 // ═══════════════════════════════════════════════════════════
 async function evaluateContentWithAI(fileName, text) {
     const wordCount = text ? text.split(/\s+/).filter(w => w.length > 1).length : 0;
@@ -107,14 +102,14 @@ async function evaluateContentWithAI(fileName, text) {
             c2: 0, c2Checks: [false, false, false], 
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'se emite: ninguno, ausenta: contenido mínimo procesable, postura por fortalecer: extensión del documento'
+            observacion: 'se emite: ninguno, ausenta: contenido mínimo procesable, postura por fortalecer: extensión e información general'
         };
     }
 
-    // 1. EVALUACIÓN C1: NORMATIVA PERÚ (Máx 5 pts)
-    const t1Keywords = ['cts', 'gratificac', 'vacacion', 'asignacion familiar', 'utilidad', 'sst', 'ley 29783', 'ley 728', 'beneficio', 'ley'];
-    const t2Keywords = ['acoso', 'hostigamiento', 'ley 27942', 'hostigamiento sexual', 'violencia laboral', 'denuncia'];
-    const t3Keywords = ['flexibilidad', 'horario', 'estudiante', 'ley 28518', 'practicante', 'jornada', 'estudios'];
+    // 1. REGLAS C1: NORMATIVA PERUANA (Máx 5 pts)
+    const t1Keywords = ['cts', 'gratificac', 'vacacion', 'asignacion familiar', 'utilidad', 'd.l. 650', 'd.l. 713', 'ley 27735', 'ley 26790', 'sctr', 'd.l. 854', 'beneficios sociales'];
+    const t2Keywords = ['acoso', 'hostigamiento', 'ley 27942', 'd.l. 1410', 'd.s. 014-2019-mimp', 'violencia sexual', 'hostigamiento sexual'];
+    const t3Keywords = ['flexibilidad', 'horario', 'estudiante', 'ley 28518', 'modalidades formativas', 'd.s. 011-2012-ed', 'jornada'];
 
     const hasC1_T1 = t1Keywords.some(kw => lowerText.includes(kw));
     const hasC1_T2 = t2Keywords.some(kw => lowerText.includes(kw));
@@ -122,10 +117,10 @@ async function evaluateContentWithAI(fileName, text) {
 
     const c1Checks = [hasC1_T1, hasC1_T2, hasC1_T3];
     const c1Count = c1Checks.filter(Boolean).length;
-    const c1Puntos = Math.min(5, Math.round((c1Count * 1.67) * 10) / 10);
+    const c1Puntos = Math.min(5, Math.round((c1Count * (5 / 3)) * 10) / 10);
 
-    // 2. EVALUACIÓN C2: CASOS REALES Y EVIDENCIA (Máx 7 pts)
-    const caseIndicators = ['caso', 'noticia', 'empresa', 'sunafil', 'sancion', 'multa', 'http', 'https', 'www', 'sentencia', 'ejemplo', 'prensa'];
+    // 2. REGLAS C2: CASOS REALES Y EVIDENCIA (Máx 7 pts)
+    const caseIndicators = ['caso', 'noticia', 'empresa', 'sunafil', 'sancion', 'multa', 'http', 'https', 'www', 'sentencia', 'denuncia', 'infobae', 'defensoria', 'el peruano'];
     const hasCaseContext = caseIndicators.some(kw => lowerText.includes(kw));
 
     const hasC2_C1 = hasC1_T1 && hasCaseContext;
@@ -134,12 +129,12 @@ async function evaluateContentWithAI(fileName, text) {
 
     const c2Checks = [hasC2_C1, hasC2_C2, hasC2_C3];
     const c2Count = c2Checks.filter(Boolean).length;
-    const c2Puntos = Math.min(7, Math.round((c2Count * 2.33) * 10) / 10);
+    const c2Puntos = Math.min(7, Math.round((c2Count * (7 / 3)) * 10) / 10);
 
-    // 3. EVALUACIÓN C3: ÉTICA Y RESPONSABILIDAD RR.HH. (Máx 8 pts)
-    const e1Keywords = ['etica', 'ético', 'ética', 'critica', 'crítica', 'reflexion', 'reflexión', 'deber', 'moral', 'equidad'];
+    // 3. REGLAS C3: ÉTICA Y ROL DE RR.HH. (Máx 8 pts)
+    const e1Keywords = ['etica', 'ético', 'ética', 'critica', 'crítica', 'reflexion', 'reflexión', 'dignidad', 'trato justo', 'opinion', 'opinión', 'considero'];
     const e2Keywords = ['recursos humanos', 'rrhh', 'rr.hh', 'gestion humana', 'gestión humana', 'talento humano', 'departamento de personal'];
-    const e3Keywords = ['propuesta', 'solucion', 'solución', 'estrategia', 'plan', 'accion', 'acción', 'medida', 'recomienda'];
+    const e3Keywords = ['propuesta', 'solucion', 'solución', 'estrategia', 'plan', 'accion', 'acción', 'medida', 'responsabilidad', 'garante'];
 
     const hasC3_E1 = e1Keywords.some(kw => lowerText.includes(kw));
     const hasC3_E2 = e2Keywords.some(kw => lowerText.includes(kw));
@@ -147,39 +142,44 @@ async function evaluateContentWithAI(fileName, text) {
 
     const c3Checks = [hasC3_E1, hasC3_E2, hasC3_E3];
     const c3Count = c3Checks.filter(Boolean).length;
-    const c3Puntos = Math.min(8, Math.round((c3Count * 2.67) * 10) / 10);
+    const c3Puntos = Math.min(8, Math.round((c3Count * (8 / 3)) * 10) / 10);
 
     // 4. BIBLIOGRAFÍA
-    const bibKeywords = ['bibliografia', 'bibliografía', 'referencia', 'fuente', 'http', 'https', 'doi.org'];
+    const bibKeywords = ['bibliografia', 'bibliografía', 'referencia', 'fuente', 'http', 'https', 'recuperado de'];
     const hasBib = bibKeywords.some(kw => lowerText.includes(kw));
 
     // 5. CÁLCULO DE NOTA FINAL
-    const notaCalculada = c1Puntos + c2Puntos + c3Puntos;
-    const notaFinal = Math.min(20, Math.round(notaCalculada * 10) / 10);
+    const notaFinal = Math.min(20, Math.round((c1Puntos + c2Puntos + c3Puntos) * 10) / 10);
 
-    // 6. GENERACIÓN DE AUTORESPUESTA / DIAGNÓSTICO SINTÉTICO
+    // 6. GENERACIÓN DEL DIAGNÓSTICO SINTÉTICO
     const emiteArr = [];
-    if (hasC1_T1) emiteArr.push('T1 Beneficios');
-    if (hasC1_T2) emiteArr.push('T2 Acoso');
-    if (hasC1_T3) emiteArr.push('T3 Flexibilidad');
+    if (hasC1_T1) emiteArr.push('marco normativo T1');
+    if (hasC1_T2) emiteArr.push('marco normativo T2');
+    if (hasC1_T3) emiteArr.push('marco normativo T3');
+    if (hasC2_C1) emiteArr.push('evidencia T1');
+    if (hasC2_C2) emiteArr.push('evidencia T2');
+    if (hasC2_C3) emiteArr.push('evidencia T3');
+    if (hasC3_E1) emiteArr.push('postura ética');
+    if (hasC3_E2) emiteArr.push('rol de RR.HH.');
 
     const ausentaArr = [];
-    if (!hasC1_T1) ausentaArr.push('Normativa T1');
-    if (!hasC1_T2) ausentaArr.push('Normativa T2');
-    if (!hasC1_T3) ausentaArr.push('Normativa T3');
-    if (!hasC2_C1) ausentaArr.push('Casos T1');
-    if (!hasC2_C2) ausentaArr.push('Casos T2');
-    if (!hasC2_C3) ausentaArr.push('Casos T3');
+    if (!hasC1_T1) ausentaArr.push('normativa T1');
+    if (!hasC1_T2) ausentaArr.push('normativa T2');
+    if (!hasC1_T3) ausentaArr.push('normativa T3 (Flexibilidad)');
+    if (!hasC2_C1) ausentaArr.push('caso real T1');
+    if (!hasC2_C2) ausentaArr.push('caso real T2');
+    if (!hasC2_C3) ausentaArr.push('caso real T3');
+    if (!hasC3_E1 || !hasC3_E2) ausentaArr.push('reflexión ética integral de RR.HH.');
 
-    let fortalecerStr = 'análisis crítico integral';
-    if (!hasC3_E1) fortalecerStr = 'postura ética personal';
-    else if (!hasC3_E2) fortalecerStr = 'delimitación del rol de RR.HH.';
-    else if (!hasC3_E3) fortalecerStr = 'propuestas de acción estratégicas';
+    let fortalecerStr = 'mantener el estándar de rigor académico';
+    if (!hasC1_T3) fortalecerStr = 'completitud en el desarrollo de todos los temas requeridos (T3)';
+    else if (!hasC2_C3) fortalecerStr = 'fundamentación de casos reales con enlaces verificables';
+    else if (!hasC3_E1) fortalecerStr = 'postura crítica personal sobre el rol de Gestión Humana';
 
     const emiteStr = emiteArr.length > 0 ? emiteArr.join(', ') : 'conceptos generales';
-    const ausentaStr = ausentaArr.length > 0 ? ausentaArr.join(', ') : 'ningún requerimiento';
+    const ausentaStr = ausentaArr.length > 0 ? ausentaArr.join(', ') : 'ningún requerimiento obligatorio';
 
-    const observacion = `se emite: ${emiteStr}, ausenta: ${ausentaStr}, postura por fortalecer: ${fortalecerStr}`;
+    const observacion = `se emite: ${emiteStr}; ausenta: ${ausentaStr}; postura por fortalecer: ${fortalecerStr}.`;
 
     return {
         estudiante: estudiante,
@@ -196,7 +196,7 @@ async function evaluateContentWithAI(fileName, text) {
     };
 }
 
-// ─── LECTORES DE ARCHIVOS ───
+// ─── EXTRACTION DE ARCHIVOS ───
 async function extractTextFromPDF(file) {
     let arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -296,7 +296,7 @@ function addError(archivo, mensaje) {
     DOM['error-list'].appendChild(li);
 }
 
-// ─── PROCESAMIENTO EN FILA INDIA (ULTRA-RÁPIDO) ───
+// ─── PROCESAMIENTO EN LOTE ───
 async function processAllFiles() {
     if (isProcessing || archivosDetectados.length === 0) return;
 
@@ -363,12 +363,10 @@ async function processAllFiles() {
     }
 }
 
-// ─── COMPONENTES VISUALES MINIMALISTAS (HIGH-CONTRAST) ───
+// ─── RENDERING DE INSIGNIAS (SOLO SI ES DETECTADO, OMITIDO SI NO) ───
 function renderPill(label, isOk) {
-    const bg = isOk ? '#dcfce7' : '#f3f4f6';
-    const color = isOk ? '#15803d' : '#9ca3af';
-    const border = isOk ? '1px solid #86efac' : '1px solid #e5e7eb';
-    return `<span style="display:inline-block; padding:2px 5px; margin:1px; font-size:0.7rem; font-weight:700; border-radius:4px; background:${bg}; color:${color}; border:${border};">${label}</span>`;
+    if (!isOk) return ''; // Se omite completamente si no se detecta
+    return `<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">${label}</span>`;
 }
 
 function renderScoreBadge(score, max) {
@@ -376,10 +374,10 @@ function renderScoreBadge(score, max) {
     let bg = '#fef2f2';
     const pct = score / max;
     if(pct >= 0.7) { color = '#10b981'; bg = '#ecfdf5'; }
-    else if(pct >= 0.5) { color = '#f59e0b'; bg = '#fffbeb'; }
+    else if(pct >= 0.4) { color = '#f59e0b'; bg = '#fffbeb'; }
 
-    return `<div style="display:inline-block; text-align:center; padding:3px 7px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}33;">
-        <span style="font-size:0.9rem; font-weight:800;">${score}</span><span style="font-size:0.7rem; opacity:0.8;">/${max}</span>
+    return `<div style="display:inline-block; text-align:center; padding:2px 6px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}33;">
+        <span style="font-size:0.85rem; font-weight:800;">${score}</span><span style="font-size:0.65rem; opacity:0.8;">/${max}</span>
     </div>`;
 }
 
@@ -388,10 +386,10 @@ function renderFinalBadge(nota) {
     if (nota < 11) bg = '#ef4444';
     else if (nota < 14) bg = '#f59e0b';
 
-    return `<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:${bg}; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">${nota} / 20</span>`;
+    return `<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:${bg}; shadow: 0 2px 4px rgba(0,0,0,0.08);">${nota} / 20</span>`;
 }
 
-// ─── RENDERIZADO DE TABLA ───
+// ─── RENDERIZADO DE LA TABLA ───
 function renderTable(fText) {
     fText = fText || '';
     const tbody = DOM['table-body'];
@@ -426,12 +424,13 @@ function renderTable(fText) {
     
     fil.forEach((r, idx) => {
         const bibIcon = r.bibliografia && r.bibliografia.ok 
-            ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ Válida</span>' 
-            : '<span style="color:#9ca3af; font-weight:500; font-size:0.8rem;">✕ Ausente</span>';
+            ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ Con Fuentes</span>' 
+            : '<span style="color:#9ca3af; font-weight:500; font-size:0.8rem;">—</span>';
         
-        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]);
-        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]);
-        const c3Pills = renderPill('E1', r.c3Checks[0]) + renderPill('E2', r.c3Checks[1]) + renderPill('E3', r.c3Checks[2]);
+        // Píldoras: Solo se generan las que son verdaderas; si no, queda vacío o con guion de omisión.
+        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
+        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
+        const c3Pills = renderPill('E1', r.c3Checks[0]) + renderPill('E2', r.c3Checks[1]) + renderPill('E3', r.c3Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
 
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid #f3f4f6';
@@ -443,9 +442,9 @@ function renderTable(fText) {
             `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c2, 7)}<br><div style="margin-top:3px;">${c2Pills}</div></td>` +
             `<td style="text-align:center; padding: 6px;">${renderScoreBadge(r.c3, 8)}<br><div style="margin-top:3px;">${c3Pills}</div></td>` +
             `<td style="text-align:center;">${renderFinalBadge(r.notaFinal)}</td>` +
-            `<td style="text-align:center; font-size:0.8rem; color:#4b5563;">${r.wordCount} palabras</td>` +
+            `<td style="text-align:center; font-size:0.8rem; color:#4b5563;">${r.wordCount} pal.</td>` +
             `<td style="text-align:center;">${bibIcon}</td>` +
-            `<td style="font-size:0.8rem; color:#374151; line-height:1.3; padding: 8px;">
+            `<td style="font-size:0.8rem; color:#374151; line-height:1.35; padding: 8px;">
                 <div style="background:#f9fafb; border-left:3px solid #6366f1; padding:6px 8px; border-radius:0 4px 4px 0;">
                    ${escapeHTML(r.observacion)}
                 </div>
@@ -562,7 +561,7 @@ function clearAll() {
     sessionStorage.removeItem('evaluador_state');
 }
 
-// ─── EVENT LISTENERS Y INICIALIZACIÓN ───
+// ─── EVENT LISTENERS ───
 document.addEventListener('DOMContentLoaded', () => {
     cacheDOM();
     checkDependencies();
