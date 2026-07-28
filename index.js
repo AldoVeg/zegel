@@ -1,6 +1,6 @@
 /* ============================================================
-   index.js — Motor de Evaluación Heurístico Determinista v5.0
-   Mapeo Jurídico Integral de Legislación Laboral Peruana
+   index.js — Motor de Evaluación Heurístico Determinista v7.0
+   MÁXIMA MINUCIOSIDAD: Proximidad Estricta Global y Ética Escalonada
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -29,7 +29,6 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
 }
 
-// Normalizador Estricto: Transforma "Ley N° 29783" en "ley n 29783" para la Regex
 function normalizeText(text) {
     if (!text) return '';
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, ' ');
@@ -71,11 +70,10 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR EXPERTO DE EVALUACIÓN (MAPEO JURÍDICO INTEGRAL)
+// MOTOR DE EVALUACIÓN: RIGUROSIDAD ABSOLUTA
 // ═══════════════════════════════════════════════════════════
 function evaluateContent(fileName, text) {
     const wordCount = text ? text.trim().split(/\s+/).filter(w => w.match(/[a-z0-9]/i)).length : 0;
-    
     const estudiante = extractStudentIdentity(fileName, text);
     const normText = normalizeText(text);
 
@@ -86,50 +84,52 @@ function evaluateContent(fileName, text) {
             c2: 0, c2Checks: [false, false, false],
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Ausenta: Contenido mínimo. | Por fortalecer: Documento en blanco o formato irreconocible.'
+            observacion: 'Ausenta: Contenido mínimo. | Por fortalecer: Documento en blanco o insuficiente.'
         };
     }
 
-    // 1. C1: NORMATIVA - CANDADOS LEGALES PERUANOS (Extensivos)
-    
-    // Universo T1 (Beneficios, CTS, Gratificaciones, Vacaciones, Utilidades, SST, Seguros, MYPE)
-    const regexT1 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|norma).{0,12}(27735|25129|26790|29783|30056|650|713|892|688|854|007 2002)/;
-    const hasT1_Law = regexT1.test(normText);
+    // 1. SEGMENTACIÓN ESTRICTA (División por párrafos o bloques de ideas de al menos 30 caracteres)
+    let rawBlocks = text.split(/(?:\r?\n){2,}|\.\s+/).map(b => normalizeText(b)).filter(b => b.length > 30);
+    if (rawBlocks.length === 0) rawBlocks = [normText];
+
+    // Diccionarios Normativos Universales
+    const regexT1 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|norma).{0,12}(27735|25129|26790|29783|30056|650|713|892|688|854)/;
     const t1Compounds = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'participacion de utilidades', 'seguridad y salud en el trabajo', 'prevencion de riesgos laborales', 'descanso vacacional', 'horas extras'];
-    const hasT1_Comp = t1Compounds.filter(kw => normText.includes(kw)).length >= 2;
-    const hasT1 = hasT1_Law || hasT1_Comp;
 
-    // Universo T2 (Acoso, Hostigamiento Sexual, Penalización)
     const regexT2 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|convenio).{0,12}(27942|1410|014 2019|190)/;
-    const hasT2_Law = regexT2.test(normText);
-    const t2Compounds = ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'violencia sexual', 'actos de hostilidad', 'conducta no deseada'];
-    const hasT2_Comp = t2Compounds.filter(kw => normText.includes(kw)).length >= 2;
-    const hasT2 = hasT2_Law || hasT2_Comp;
+    const t2Compounds = ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'violencia sexual', 'conducta no deseada'];
 
-    // Universo T3 (Modalidades Formativas, Flexibilidad para Estudiantes)
     const regexT3 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo).{0,12}(28518|011 2012|31396)/;
-    const hasT3_Law = regexT3.test(normText);
-    const t3Compounds = ['modalidad formativa', 'modalidades formativas', 'facilidades horarias', 'flexibilidad horaria', 'adaptar la jornada', 'practicas preprofesionales', 'practicas profesionales', 'jornada formativa'];
-    const hasT3_Comp = t3Compounds.filter(kw => normText.includes(kw)).length >= 1; // Solo 1 porque son muy precisos
-    const hasT3 = hasT3_Law || hasT3_Comp;
+    const t3Compounds = ['modalidad formativa', 'modalidades formativas', 'facilidades horarias', 'flexibilidad horaria', 'practicas preprofesionales', 'practicas profesionales', 'jornada formativa'];
+
+    // Evidencias / Casos (Ampliados para contextos forenses y reales)
+    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'mtpe', 'corte suprema', 'jurisprudencia', 'casacion', 'expediente', 'multa impuesta'];
+
+    // Funciones Evaluadoras por Bloque (Garantizan proximidad)
+    const hasT1InBlock = (b) => regexT1.test(b) || t1Compounds.filter(kw => b.includes(kw)).length >= 2;
+    const hasT2InBlock = (b) => regexT2.test(b) || t2Compounds.filter(kw => b.includes(kw)).length >= 2;
+    const hasT3InBlock = (b) => regexT3.test(b) || t3Compounds.filter(kw => b.includes(kw)).length >= 1;
+    const hasCaseInBlock = (b) => caseKw.some(kw => b.includes(kw));
+
+    // 2. C1: NORMATIVA (Puede detectarse en el bloque o en el texto general)
+    const hasT1 = rawBlocks.some(b => hasT1InBlock(b)) || regexT1.test(normText);
+    const hasT2 = rawBlocks.some(b => hasT2InBlock(b)) || regexT2.test(normText);
+    const hasT3 = rawBlocks.some(b => hasT3InBlock(b)) || regexT3.test(normText);
 
     const c1Checks = [hasT1, hasT2, hasT3];
-    const c1Puntos = c1Checks.filter(Boolean).length * 2; 
+    const c1Puntos = c1Checks.filter(Boolean).length * 2;
 
-    // 2. C2: CASOS REALES Y EVIDENCIA 
-    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'equidad pe', 'mtpe', 'ministerio de trabajo'];
-    const hasCaseContext = caseKw.some(kw => normText.includes(kw));
-
-    const hasC1_Case = hasT1 && hasCaseContext;
-    const hasC2_Case = hasT2 && hasCaseContext;
-    const hasC3_Case = hasT3 && hasCaseContext;
+    // 3. C2: CASOS REALES (Condición EXCLUSIVA de Proximidad en el mismo bloque)
+    const hasC1_Case = rawBlocks.some(b => hasT1InBlock(b) && hasCaseInBlock(b));
+    const hasC2_Case = rawBlocks.some(b => hasT2InBlock(b) && hasCaseInBlock(b));
+    const hasC3_Case = rawBlocks.some(b => hasT3InBlock(b) && hasCaseInBlock(b));
 
     const c2Checks = [hasC1_Case, hasC2_Case, hasC3_Case];
-    const c2Puntos = c2Checks.filter(Boolean).length * 2; 
+    const c2Puntos = c2Checks.filter(Boolean).length * 2;
 
-    // 3. C3: ÉTICA Y ROL RR.HH. (8 pts)
+    // 4. C3: ÉTICA ESCALONADA (Basada en Postura + Completitud del Ensayo)
     const p1Kw = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'valor inherente', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
-    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa', 'proteccion de los activos'];
+    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa'];
     const p3Kw = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'solo se debe cumplir', 'situacion aislada'];
 
     const p1Hits = p1Kw.filter(kw => normText.includes(kw)).length;
@@ -141,49 +141,58 @@ function evaluateContent(fileName, text) {
     let c3Checks = [false, false, false];
 
     if (p3Hits > 0) {
+        // Normaliza o justifica malas prácticas = 0 puntos.
         c3Puntos = 0; 
-        stanceMsg = 'Postura Deficiente (justifica o normaliza malas prácticas)';
+        stanceMsg = 'Postura Deficiente (justifica o normaliza malas prácticas laborales)';
         c3Checks = [true, false, false];
     } else if (p1Hits > 0) {
-        c3Puntos = 8; 
-        stanceMsg = 'Postura Ética Humana (excelente visión integradora de RR.HH.)';
-        c3Checks = [true, true, true];
+        // Tiene postura humana, pero los puntos dependen de qué tan completo es su trabajo.
+        if (c1Puntos === 6 && c2Puntos === 6) {
+            c3Puntos = 8; 
+            stanceMsg = 'Postura Ética Humana Impecable (Análisis y evidencias completos al 100%)';
+            c3Checks = [true, true, true];
+        } else if (c1Puntos >= 4 && c2Puntos >= 4) {
+            c3Puntos = 6; 
+            stanceMsg = 'Postura Ética Humana Buena (Penalizada levemente por omisión de 1 tema o 1 caso)';
+            c3Checks = [true, true, false];
+        } else {
+            c3Puntos = 4; 
+            stanceMsg = 'Postura Ética Humana Parcial (La intención es buena, pero existen vacíos graves en normativas o evidencias)';
+            c3Checks = [true, false, false];
+        }
     } else if (p2Hits > 0) {
+        // Enfoque solo en defender a la empresa / evitar multas = 4 puntos máximo.
         c3Puntos = 4; 
-        stanceMsg = 'Postura Legalista-Corporativa (enfocada mayormente en multas y empresa)';
-        c3Checks = [true, true, false];
+        stanceMsg = 'Postura Legalista-Corporativa (Enfocada en evitar multas de Sunafil y proteger a la empresa)';
+        c3Checks = [true, false, false];
     } else {
         c3Puntos = 0;
         stanceMsg = 'No se evidencia reflexión crítica ni postura personal clara';
     }
 
-    // 4. RADARES ADICIONALES
+    // 5. RADARES ADICIONALES (APA, Conectores)
     let fortalezasExtra = [];
-    
-    // APA Estricto (Año + Fuente)
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
-    if (!hasAPA) fortalezasExtra.push('Formato APA en bibliografía');
+    if (!hasAPA) fortalezasExtra.push('Formato APA');
 
-    // Conectores
     const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
-    if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos (causa/efecto)');
+    if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos');
 
-    // Anti-Subtítulos
     const subtitulosProhibidos = ['tema 1', 'parte 1', 'parte 2', 'reflexion final', 'tema 2', 'tema 3'];
-    if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa sin subtítulos');
+    if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa fluida (sin subtítulos escolares)');
 
-    // 5. CONSTRUCCIÓN DEL DIAGNÓSTICO
+    // 6. CONSTRUCCIÓN DEL DIAGNÓSTICO SINTÉTICO (Para el PDF/Excel)
     const ausentaArr = [];
     if (!hasT1) ausentaArr.push('T1 (Beneficios/SST)');
     if (!hasT2) ausentaArr.push('T2 (Acoso)');
     if (!hasT3) ausentaArr.push('T3 (Flexibilidad)');
-    if (!hasC1_Case && hasT1) ausentaArr.push('Caso T1');
-    if (!hasC2_Case && hasT2) ausentaArr.push('Caso T2');
-    if (!hasC3_Case && hasT3) ausentaArr.push('Caso T3');
+    if (!hasC1_Case && hasT1) ausentaArr.push('Caso Real T1');
+    if (!hasC2_Case && hasT2) ausentaArr.push('Caso Real T2');
+    if (!hasC3_Case && hasT3) ausentaArr.push('Caso Real T3');
 
-    let diagnostico = `Ausenta: ${ausentaArr.length > 0 ? ausentaArr.join(', ') : 'Ningún requerimiento principal'}. | `;
-    diagnostico += `Por fortalecer: ${stanceMsg}`;
-    if (fortalezasExtra.length > 0) diagnostico += `, ${fortalezasExtra.join(', ')}.`;
+    let diagnostico = `Ausenta: ${ausentaArr.length > 0 ? ausentaArr.join(', ') : 'Desarrollo completo (0 omisiones)'}. | `;
+    diagnostico += `Evaluación Ética: ${stanceMsg}`;
+    if (fortalezasExtra.length > 0) diagnostico += ` | Por mejorar formato: ${fortalezasExtra.join(', ')}.`;
     else diagnostico += `.`;
 
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
@@ -200,7 +209,7 @@ function evaluateContent(fileName, text) {
     };
 }
 
-// ─── LECTORES (PDF/DOCX/ZIP) ───
+// ─── LECTORES DE ARCHIVOS (PDF, DOCX, ZIP) ───
 async function extractTextFromPDF(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -271,7 +280,7 @@ async function processAllFiles() {
             procesados++;
             const pct = Math.round((procesados / total) * 100);
 
-            if (DOM['loading-detail']) DOM['loading-detail'].textContent = `Evaluando (${procesados}/${total}): ${item.name}`;
+            if (DOM['loading-detail']) DOM['loading-detail'].textContent = `Evaluando minucioso (${procesados}/${total}): ${item.name}`;
             if (DOM['overlay-progress']) DOM['overlay-progress'].value = pct;
             if (DOM['overlay-percent']) DOM['overlay-percent'].textContent = `${pct}%`;
 
@@ -286,7 +295,7 @@ async function processAllFiles() {
             } catch (err) {
                 addError(item.name, 'Error al procesar: ' + err.message);
             }
-            await new Promise(r => setTimeout(r, 10)); // Anti-congelamiento
+            await new Promise(r => setTimeout(r, 10));
         }
     } catch (criticalErr) {
         addError("Sistema", "Se detuvo el proceso por un error inesperado.");
@@ -303,7 +312,7 @@ async function processAllFiles() {
     }
 }
 
-// ─── RENDERIZADO VISUAL EN LA TABLA ───
+// ─── RENDERIZADO VISUAL EN TABLA ───
 function renderPill(label, isOk) {
     if (!isOk) return ''; 
     return `<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">${label}</span>`;
@@ -346,14 +355,15 @@ function renderTable(filterText = '') {
     }
 
     filtered.forEach((r, idx) => {
-        const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ Estructura APA</span>' : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
+        const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ APA OK</span>' : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
 
         const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
         const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
         
         let c3Pills = '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        if (r.c3 === 8) c3Pills = renderPill('Humano (8p)', true);
-        else if (r.c3 === 4) c3Pills = renderPill('Legalista (4p)', true);
+        if (r.c3 === 8) c3Pills = renderPill('Óptimo (8p)', true);
+        else if (r.c3 === 6) c3Pills = renderPill('Bueno (6p)', true);
+        else if (r.c3 === 4) c3Pills = renderPill('Parcial/Legal (4p)', true);
         else if (r.c3Checks[0]) c3Pills = renderPill('Deficiente (0p)', true);
 
         const tr = document.createElement('tr');
@@ -375,7 +385,7 @@ function renderTable(filterText = '') {
     });
 }
 
-// ─── GESTIÓN DE COLA DE ARCHIVOS Y EVENTOS ───
+// ─── GESTIÓN DE EVENTOS DE USUARIO ───
 function addFilesToList(files) {
     const validTypes = ['pdf', 'docx', 'zip'];
     let addedAny = false;
