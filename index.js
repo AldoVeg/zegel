@@ -1,6 +1,6 @@
 /* ============================================================
-   index.js — Motor de Evaluación Heurístico Determinista
-   Arquitectura 6-6-8. Prevención de bloqueos (Anti-Crash).
+   index.js — Motor de Evaluación Heurístico Determinista v3.0
+   Arquitectura 6-6-8. Radares Ponderados Anti-Falsos Positivos.
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -29,9 +29,10 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
 }
 
+// Normalizador avanzado: Quita acentos, pasa a minúsculas y estandariza espacios
 function normalizeText(text) {
     if (!text) return '';
-    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, ' ');
 }
 
 function detectFileType(file) {
@@ -69,11 +70,22 @@ function extractStudentIdentity(fileName, text) {
     return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
 }
 
+// Función evaluadora de temas con pesos (Evita el caso Andrea Bardales)
+function evalTheme(normText, highArr, medArr, lowArr) {
+    let score = 0;
+    highArr.forEach(kw => { if (normText.includes(kw)) score += 2.0; });
+    medArr.forEach(kw => { if (normText.includes(kw)) score += 1.0; });
+    lowArr.forEach(kw => { if (normText.includes(kw)) score += 0.5; });
+    return score >= 1.5; // Umbral exigente: Requiere un match alto, o 2 medios.
+}
+
 // ═══════════════════════════════════════════════════════════
-// MOTOR EXPERTO DE EVALUACIÓN (6-6-8) Y RADARES ADICIONALES
+// MOTOR EXPERTO DE EVALUACIÓN (6-6-8) Y RADARES PONDERADOS
 // ═══════════════════════════════════════════════════════════
 function evaluateContent(fileName, text) {
-    const wordCount = text ? text.split(/\s+/).filter(w => w.length > 1).length : 0;
+    // FIX CONTEO DE PALABRAS: Iguala a MS Word. Cuenta todo lo que sea alfanumérico.
+    const wordCount = text ? text.trim().split(/\s+/).filter(w => w.match(/[a-z0-9]/i)).length : 0;
+    
     const estudiante = extractStudentIdentity(fileName, text);
     const normText = normalizeText(text);
 
@@ -84,24 +96,34 @@ function evaluateContent(fileName, text) {
             c2: 0, c2Checks: [false, false, false],
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Ausenta: Contenido mínimo. | Por fortalecer: Extensión total del documento.'
+            observacion: 'Ausenta: Contenido mínimo. | Por fortalecer: Documento en blanco o formato irreconocible.'
         };
     }
 
-    // 1. C1: NORMATIVA (2 Puntos por tema = Máx 6 pts)
-    const t1Kw = ['cts', 'compensacion por tiempo', 'gratificacion', 'vacacion', 'asignacion familiar', 'utilidad', 'seguro de vida ley', 'dl 650', 'dl 713', 'ley 27735', 'mype', 'ley 26790'];
-    const t2Kw = ['acoso', 'hostigamiento', 'ley 27942', 'dl 1410', 'ds 014-2019-mimp', 'violencia sexual'];
-    const t3Kw = ['flexibilidad', 'horario', 'estudiante', 'ley 28518', 'modalidad formativa', 'jornada', 'ds 011-2012-ed'];
+    // 1. C1: NORMATIVA (Radar Ponderado anti-falsos positivos)
+    // T1: Beneficios
+    const t1High = ['27735', '26790', '650', '713', '854'];
+    const t1Med  = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'utilidades'];
+    const t1Low  = ['cts', 'gratificacion', 'vacaciones', 'mype', 'beneficios'];
+    const hasT1 = evalTheme(normText, t1High, t1Med, t1Low);
 
-    const hasT1 = (t1Kw.filter(kw => normText.includes(kw)).length >= 2) || normText.includes('ley 27735');
-    const hasT2 = (t2Kw.filter(kw => normText.includes(kw)).length >= 2) || normText.includes('ley 27942');
-    const hasT3 = (t3Kw.filter(kw => normText.includes(kw)).length >= 2) || normText.includes('ley 28518');
+    // T2: Acoso
+    const t2High = ['27942', '1410', '014-2019'];
+    const t2Med  = ['hostigamiento sexual', 'comite de intervencion'];
+    const t2Low  = ['acoso', 'violencia sexual'];
+    const hasT2 = evalTheme(normText, t2High, t2Med, t2Low);
+
+    // T3: Flexibilidad
+    const t3High = ['28518', '011-2012'];
+    const t3Med  = ['modalidad formativa', 'facilidades horarias', 'adaptar la jornada'];
+    const t3Low  = ['flexibilidad', 'horario', 'estudiante', 'jornada']; // Estudiante pesa poco
+    const hasT3 = evalTheme(normText, t3High, t3Med, t3Low);
 
     const c1Checks = [hasT1, hasT2, hasT3];
     const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
-    // 2. C2: CASOS REALES Y EVIDENCIA (2 Puntos por caso = Máx 6 pts)
-    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'caso real', 'denuncia', 'resolucion', 'sentencia'];
+    // 2. C2: CASOS REALES Y EVIDENCIA 
+    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'equidad.pe'];
     const hasCaseContext = caseKw.some(kw => normText.includes(kw));
 
     const hasC1_Case = hasT1 && hasCaseContext;
@@ -111,9 +133,9 @@ function evaluateContent(fileName, text) {
     const c2Checks = [hasC1_Case, hasC2_Case, hasC3_Case];
     const c2Puntos = c2Checks.filter(Boolean).length * 2; 
 
-    // 3. C3: ÉTICA Y ROL RR.HH. (Diccionarios P1, P2, P3 = Máx 8 pts)
+    // 3. C3: ÉTICA Y ROL RR.HH. (8 pts)
     const p1Kw = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'valor inherente', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
-    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa', 'proteccion de los activos', 'productividad'];
+    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa', 'productividad'];
     const p3Kw = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'solo se debe cumplir', 'situacion aislada'];
 
     const p1Hits = p1Kw.filter(kw => normText.includes(kw)).length;
@@ -126,31 +148,31 @@ function evaluateContent(fileName, text) {
 
     if (p3Hits > 0) {
         c3Puntos = 0; 
-        stanceMsg = 'Postura Justificadora (normaliza malas prácticas)';
+        stanceMsg = 'Postura Deficiente/Justificadora (normaliza malas prácticas)';
         c3Checks = [true, false, false];
     } else if (p1Hits > 0) {
         c3Puntos = 8; 
-        stanceMsg = 'Postura Ética Humana (excelente visión integradora)';
+        stanceMsg = 'Postura Ética Humana (excelente visión integradora de RR.HH.)';
         c3Checks = [true, true, true];
     } else if (p2Hits > 0) {
         c3Puntos = 4; 
-        stanceMsg = 'Postura Legalista-Corporativa (se enfoca solo en evitar multas)';
+        stanceMsg = 'Postura Legalista-Corporativa (enfocada mayormente en multas y empresa)';
         c3Checks = [true, true, false];
     } else {
         c3Puntos = 0;
-        stanceMsg = 'No se evidencia reflexión crítica estructurada';
+        stanceMsg = 'No se evidencia reflexión crítica ni postura personal clara';
     }
 
     // 4. RADARES ADICIONALES
     let fortalezasExtra = [];
-    const hasAPA = /\(\d{4}\).{0,60}?(recuperado|http|www|ley|resolucion)/i.test(text);
+    const hasAPA = /\(\d{4}\).{0,60}?(recuperado|http|www|ley|resolucion|diario)/i.test(normText);
     if (!hasAPA) fortalezasExtra.push('Formato APA en bibliografía');
 
     const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
     if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos de causa/efecto');
 
-    const subtitulosProhibidos = ['tema 1:', 'parte 1', 'parte 2', 'reflexion final', 'tema 2:', 'tema 3:'];
-    if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa (eliminar subtítulos forzados)');
+    const subtitulosProhibidos = ['tema 1', 'parte 1', 'parte 2', 'reflexion final', 'tema 2', 'tema 3'];
+    if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa sin subtítulos');
 
     // 5. CONSTRUCCIÓN DEL DIAGNÓSTICO
     const ausentaArr = [];
@@ -266,15 +288,11 @@ async function processAllFiles() {
             } catch (err) {
                 addError(item.name, 'Error al procesar: ' + err.message);
             }
-
-            // Breve pausa para no congelar el navegador
-            await new Promise(r => setTimeout(r, 10));
+            await new Promise(r => setTimeout(r, 10)); // Anti-congelamiento
         }
     } catch (criticalErr) {
-        console.error("Error crítico en el loop: ", criticalErr);
         addError("Sistema", "Se detuvo el proceso por un error inesperado.");
     } finally {
-        // SEGURIDAD: Siempre desbloquear el sistema
         isProcessing = false;
         if (DOM['loading-overlay']) DOM['loading-overlay'].classList.add('hidden');
 
@@ -374,7 +392,7 @@ function addFilesToList(files) {
     
     if (addedAny) {
         updateFileListUI();
-        processAllFiles(); // Disparo automático
+        processAllFiles();
     }
 }
 
@@ -473,21 +491,20 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM['file-input']?.addEventListener('change', function(ev) { 
         if (this.files.length) {
             addFilesToList(this.files); 
-            ev.target.value = ''; // FIX: Limpia el input para permitir subir el mismo archivo de nuevo
+            ev.target.value = ''; 
         }
     });
     
     DOM['folder-input']?.addEventListener('change', function(ev) { 
         if (this.files.length) {
             addFilesToList(this.files);
-            ev.target.value = ''; // FIX: Limpia el input
+            ev.target.value = ''; 
         }
     });
 
     DOM['btn-folder']?.addEventListener('click', () => DOM['folder-input'].click());
     DOM['btn-clear']?.addEventListener('click', clearAll);
     
-    // FIX: Botón de cancelar fuerza el desbloqueo del sistema
     DOM['btn-cancel']?.addEventListener('click', () => {
         if (abortController) abortController.abort();
         isProcessing = false; 
