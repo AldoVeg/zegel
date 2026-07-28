@@ -12,18 +12,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-
     <header class="app-header">
         <div class="header-container">
             <h1>📋 Sistema de Evaluación Automática de Ensayos</h1>
-            <p>Auditoría determinista local: Normativa, Evidencias y Ética de RR.HH.</p>
+            <p>Auditoría determinista: Normativa, Evidencias y Análisis Psicométrico de Postura Ética</p>
         </div>
     </header>
 
     <main class="app-container">
-        
         <div id="cdn-alert" class="alert-box alert-warning hidden">
-            <span>⚠️</span> <span id="cdn-alert-text">Cargando componentes del sistema...</span>
+            <span>⚠️</span> <span id="cdn-alert-text">Cargando componentes...</span>
         </div>
 
         <section class="upload-card">
@@ -32,15 +30,12 @@
                     <div class="upload-icon">📁</div>
                     <h3>Arrastra y suelta aquí la carpeta o archivos</h3>
                     <p>Soporta carpetas completas, archivos individuales <strong>.PDF</strong>, <strong>.DOCX</strong> o <strong>.ZIP</strong></p>
-                    
                     <div class="button-group">
                         <label class="btn btn-primary">
                             📄 Seleccionar Archivos
                             <input type="file" id="file-input" multiple accept=".pdf,.docx,.zip" class="hidden">
                         </label>
-                        <button id="btn-folder" class="btn btn-secondary">
-                            📂 Cargar Carpeta Completa
-                        </button>
+                        <button id="btn-folder" class="btn btn-secondary">📂 Cargar Carpeta Completa</button>
                         <input type="file" id="folder-input" webkitdirectory directory multiple class="hidden">
                     </div>
                 </div>
@@ -69,7 +64,6 @@
                     <h2>📊 Consolidado General</h2>
                     <span id="results-count" class="badge-info hidden">Mostrando 0 resultados</span>
                 </div>
-                
                 <div class="action-tools">
                     <input type="text" id="filter-input" placeholder="🔍 Buscar estudiante..." class="search-input">
                     <button id="btn-export-csv" class="btn btn-success" disabled>📥 Excel (CSV)</button>
@@ -89,7 +83,7 @@
                             <th class="sortable" data-sort="notaFinal" style="text-align: center;">Nota Final</th>
                             <th style="text-align: center;">Extensión</th>
                             <th style="text-align: center;">Fuentes</th>
-                            <th style="width: 35%;">Diagnóstico Sintético</th>
+                            <th style="width: 40%;">Diagnóstico (Ausencias y Postura)</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -100,21 +94,19 @@
                 </table>
             </div>
         </section>
-
     </main>
 
     <div id="loading-overlay" class="overlay hidden">
         <div class="loader-card">
             <div class="spinner"></div>
             <h3 id="loading-title">Evaluando documentos...</h3>
-            <p id="loading-detail">Extrayendo texto y analizando patrones...</p>
+            <p id="loading-detail">Analizando diccionarios éticos y patrones...</p>
             <progress id="overlay-progress" value="0" max="100"></progress>
             <span id="overlay-percent">0%</span>
             <br>
             <button id="btn-cancel" class="btn btn-small btn-secondary" style="margin-top:15px;">Cancelar</button>
         </div>
     </div>
-
     <script src="index.js"></script>
 </body>
 </html>
