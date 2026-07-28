@@ -1,6 +1,7 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
    Procesamiento en Fila India | Memoria Optimizada | Rúbrica 0-20
+   (Motor Heurístico Fortalecido - Nivel de Minuciosidad Máxima)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -183,7 +184,6 @@ async function collectFilesFromDataTransfer(dataTransfer) {
     const files = [];
     const items = dataTransfer.items;
     if (!items) {
-        // Fallback: usar files directamente
         for (let i = 0; i < dataTransfer.files.length; i++) {
             files.push(dataTransfer.files[i]);
         }
@@ -202,7 +202,6 @@ async function collectFilesFromDataTransfer(dataTransfer) {
         } else if (entry && entry.isFile) {
             files.push(item.getAsFile());
         } else {
-            // Fallback
             const f = item.getAsFile();
             if (f) files.push(f);
         }
@@ -233,7 +232,6 @@ async function readDirectory(entry) {
         });
     };
 
-    // Leer en lotes (readEntries devuelve máximo 100)
     let batch;
     do {
         batch = await readAllEntries();
@@ -254,7 +252,6 @@ async function extractTextFromPDF(file) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         fullText += textContent.items.map(item => item.str).join(' ') + ' ';
-
         page.cleanup();
 
         DOM['status-text'].innerHTML =
@@ -316,7 +313,7 @@ async function extractFilesFromZip(zipFile) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  MOTOR DE EVALUACIÓN EXHAUSTIVO
+//  MOTOR DE EVALUACIÓN EXHAUSTIVO (FORTALECIDO C1, C2, C3)
 // ═══════════════════════════════════════════════════════════
 
 const DICCIONARIO = {
@@ -326,8 +323,8 @@ const DICCIONARIO = {
             'ds 005 2012', 'ley 25129', 'ley 26790', 'ley 30056'
         ],
         conceptos: [
-            'seguridad y salud', 'cts', 'compensacion por tiempo',
-            'gratificacion', 'asignacion familiar', 'utilidades',
+            'seguridad y salud', 'compensacion por tiempo',
+            'asignacion familiar', 'participacion en utilidades',
             'descanso vacacional', 'horas extras', 'riesgos laborales',
             'seguro de vida ley'
         ]
@@ -340,8 +337,7 @@ const DICCIONARIO = {
         conceptos: [
             'hostigamiento sexual', 'acoso sexual', 'acoso laboral',
             'comite de intervencion', 'chantaje sexual', 'violencia laboral',
-            'ambiente hostil', 'conducta no deseada',
-            'comite frente al hostigamiento'
+            'ambiente hostil', 'conducta no deseada'
         ]
     },
     T3: {
@@ -357,28 +353,25 @@ const DICCIONARIO = {
     },
     NARRATIVA_CASO: {
         actores: [
-            'trabajador', 'trabajadora', 'empleador', 'empresa',
-            'colaborador', 'demandante', 'gerente', 'jefe',
-            'practicante', 'victima', 'inspector', 'sindicato',
-            'recursos humanos', 'rrhh'
+            'el trabajador', 'la trabajadora', 'empleador', 'la empresa',
+            'demandante', 'gerente', 'practicante', 'victima', 'sindicato'
         ],
+        // C2 requiere una vulneración explícita
         conflictos: [
-            'despidio', 'incumplio', 'vulnero', 'demando', 'sanciono',
-            'sufrio', 'acoso', 'accidento', 'omitio', 'reclamo',
-            'denuncio', 'multo', 'afecto', 'obligo', 'coacciono',
-            'no pago', 'accidente de trabajo'
+            'despidio', 'incumplio', 'vulnero', 'sufrio', 'acoso', 
+            'accidento', 'omitio', 'afecto', 'obligo', 'coacciono', 
+            'no pago', 'accidente de trabajo', 'fallecio'
         ],
-        contextoLegal: [
-            'sunafil', 'el peruano', 'tribunal constitucional',
-            'corte suprema', 'expediente', 'casacion', 'resolucion',
-            'sentencia', 'multa', 'inspeccion', 'demanda laboral',
-            'conciliacion'
+        // C2 requiere un desenlace formal o denuncia evidenciable
+        consecuencias: [
+            'demando', 'sanciono', 'reclamo', 'denuncio', 'multo', 
+            'sunafil', 'tribunal constitucional', 'corte suprema', 
+            'expediente', 'casacion', 'resolucion', 'sentencia', 'inspeccion'
         ]
     }
 };
 
 function extractStudentIdentity(fileName, text) {
-    // 1. Intentar extraer del encabezado del texto
     const patterns = [
         /(?:estudiante|autor|presentado\s+por|elaborado\s+por|alumno|alumna)\s*:\s*([^\n\.]{3,60})/i,
         /nombre\s*(?:del\s*)?(?:estudiante|alumno|autor)\s*:\s*([^\n\.]{3,60})/i,
@@ -392,7 +385,6 @@ function extractStudentIdentity(fileName, text) {
         }
     }
 
-    // 2. Fallback: nombre del archivo
     let name = fileName.replace(/\.(pdf|docx|doc)$/i, '');
     name = name.replace(/[_\-]/g, ' ').trim();
     if (name.length > 3) return name;
@@ -419,17 +411,15 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // Dividir en bloques (párrafos) para evaluar contexto
+    // Dividir en bloques densos para evitar que frases sueltas formen casos falsos
     const bloques = text
         .split(/(?:\r?\n){2,}|\.\s+/)
         .map(function(p) { return normalizeText(p); })
         .filter(function(p) { return p.length > 30; });
 
-    // Variables de densidad por tema
     let palabrasT1 = 0, palabrasT2 = 0, palabrasT3 = 0;
     let hasT1_Case = false, hasT2_Case = false, hasT3_Case = false;
 
-    // Evaluar bloque a bloque
     bloques.forEach(function(bloque) {
         const palabrasEnBloque = bloque.split(/\s+/).length;
 
@@ -444,31 +434,37 @@ function evaluateContent(fileName, text) {
         if (esT2) palabrasT2 += palabrasEnBloque;
         if (esT3) palabrasT3 += palabrasEnBloque;
 
+        // Tríada Narrativa Exhaustiva (C2)
         const tieneActor = DICCIONARIO.NARRATIVA_CASO.actores.some(kw => bloque.includes(kw));
         const tieneConflicto = DICCIONARIO.NARRATIVA_CASO.conflictos.some(kw => bloque.includes(kw));
-        const tieneContextoLegal = DICCIONARIO.NARRATIVA_CASO.contextoLegal.some(kw => bloque.includes(kw));
+        const tieneConsecuencia = DICCIONARIO.NARRATIVA_CASO.consecuencias.some(kw => bloque.includes(kw));
 
-        if ((tieneActor && tieneConflicto) || tieneContextoLegal) {
+        // Para validar un caso, el relato debe cruzar obligatoriamente el hecho y la evidencia formal/acción.
+        if (tieneActor && (tieneConflicto || tieneConsecuencia)) {
             if (esT1) hasT1_Case = true;
             if (esT2) hasT2_Case = true;
             if (esT3) hasT3_Case = true;
         }
     });
 
-    // ─── CRITERIO 1: Análisis Normativo (umbral 40 palabras por tema) ───
-    const UMBRAL_PALABRAS = 40;
+    // ─── CRITERIO 1 (Normativa Estricta) ───
+    const UMBRAL_PALABRAS = 45; // Aumentado para evitar temas "muy cortitos"
     const hasT1_Norm = palabrasT1 >= UMBRAL_PALABRAS;
     const hasT2_Norm = palabrasT2 >= UMBRAL_PALABRAS;
     const hasT3_Norm = palabrasT3 >= UMBRAL_PALABRAS;
 
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
-    const c1Puntos = c1Checks.filter(Boolean).length * 2; // 2 pts por tema bien desarrollado
+    const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
-    // ─── CRITERIO 2: Desarrollo de Casos ───
+    // ─── CRITERIO 2 (Efecto Dominó: El Caso no existe si la norma es insuficiente) ───
+    hasT1_Case = hasT1_Case && hasT1_Norm;
+    hasT2_Case = hasT2_Case && hasT2_Norm;
+    hasT3_Case = hasT3_Case && hasT3_Norm;
+
     const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
-    const c2Puntos = c2Checks.filter(Boolean).length * 2; // 2 pts por caso detectado
+    const c2Puntos = c2Checks.filter(Boolean).length * 2; 
 
-    // ─── CRITERIO 3: Reflexión Ética ───
+    // ─── CRITERIO 3 (Ética Escalonada) ───
     const kwHumanista = [
         'dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad',
         'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental',
@@ -518,13 +514,10 @@ function evaluateContent(fileName, text) {
         stanceMsg = 'Sin reflexión crítica clara';
     }
 
-    // ─── BIBLIOGRAFÍA ───
+    // ─── BIBLIOGRAFÍA Y DIAGNÓSTICO ───
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
-    const biblioDetalle = hasAPA
-        ? 'Fuentes detectadas con formato referencial'
-        : 'Sin fuentes verificables detectadas';
+    const biblioDetalle = hasAPA ? 'Fuentes verificables' : 'Sin fuentes estructuradas';
 
-    // ─── DIAGNÓSTICO SINTÉTICO ───
     const ausencias = [];
     if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 (Insuficiente)' : 'T1 (Ausente)');
     if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 (Insuficiente)' : 'T2 (Ausente)');
@@ -744,7 +737,6 @@ function setupSortableHeaders() {
                 sortDirection = 'asc';
             }
 
-            // Actualizar clases visuales
             headers.forEach(function(h) {
                 h.classList.remove('asc', 'desc');
                 if (h.dataset.sort) h.setAttribute('aria-sort', 'none');
@@ -848,7 +840,6 @@ function exportPDF() {
 
 // ─── Configuración de Eventos ───
 function setupEvents() {
-    // ── Drop Zone ──
     var dz = DOM['drop-zone'];
     if (dz) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(ev) {
@@ -860,7 +851,6 @@ function setupEvents() {
         });
 
         dz.addEventListener('dragleave', function(e) {
-            // Solo remover si realmente salimos del dropzone (no de un hijo)
             if (!dz.contains(e.relatedTarget)) {
                 dz.classList.remove('dragover');
             }
@@ -877,14 +867,12 @@ function setupEvents() {
             }
         });
 
-        // Click en dropzone abre selector de archivos
         dz.addEventListener('click', function(e) {
             if (e.target === dz || e.target.closest('.drop-zone-content')) {
                 if (DOM['file-input']) DOM['file-input'].click();
             }
         });
 
-        // Accesibilidad: teclado
         dz.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -893,11 +881,10 @@ function setupEvents() {
         });
     }
 
-    // ── Input de archivos ──
     if (DOM['file-input']) {
         DOM['file-input'].addEventListener('change', async function(e) {
             var files = Array.from(e.target.files);
-            e.target.value = ''; // Reset para permitir re-seleccionar el mismo archivo
+            e.target.value = ''; 
             if (files.length > 0) {
                 await addFilesToList(files);
                 processAllFiles();
@@ -905,7 +892,6 @@ function setupEvents() {
         });
     }
 
-    // ── Input de carpeta ──
     if (DOM['folder-input']) {
         DOM['folder-input'].addEventListener('change', async function(e) {
             var files = Array.from(e.target.files);
@@ -917,19 +903,16 @@ function setupEvents() {
         });
     }
 
-    // ── Botón de carpeta ──
     if (DOM['btn-folder']) {
         DOM['btn-folder'].addEventListener('click', function() {
             if (DOM['folder-input']) DOM['folder-input'].click();
         });
     }
 
-    // ── Botón Limpiar ──
     if (DOM['btn-clear']) {
         DOM['btn-clear'].addEventListener('click', clearAll);
     }
 
-    // ── Botón Cancelar ──
     if (DOM['btn-cancel']) {
         DOM['btn-cancel'].addEventListener('click', function() {
             if (abortController) abortController.abort();
@@ -939,7 +922,6 @@ function setupEvents() {
         });
     }
 
-    // ── Descartar errores ──
     if (DOM['btn-dismiss-errors']) {
         DOM['btn-dismiss-errors'].addEventListener('click', function() {
             if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
@@ -947,14 +929,12 @@ function setupEvents() {
         });
     }
 
-    // ── Filtro en vivo ──
     if (DOM['filter-input']) {
         DOM['filter-input'].addEventListener('input', function() {
             renderTable(this.value);
         });
     }
 
-    // ── Exportación ──
     if (DOM['btn-export-csv']) {
         DOM['btn-export-csv'].addEventListener('click', exportCSV);
     }
@@ -962,22 +942,5 @@ function setupEvents() {
         DOM['btn-export-pdf'].addEventListener('click', exportPDF);
     }
 
-    // ── Ordenamiento ──
     setupSortableHeaders();
-}
-
-// ─── Inicialización ───
-function init() {
-    cacheDOM();
-    if (checkDependencies()) {
-        configurePDFJS();
-        setupEvents();
-        loadState();
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
 }
