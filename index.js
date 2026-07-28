@@ -1,7 +1,7 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
    Procesamiento en Fila India | Memoria Optimizada | Rúbrica 0-20
-   (Motor Heurístico Fortalecido - Nivel de Minuciosidad Máxima)
+   (FORTALECIDO: Eventos Desbloqueados y Minuciosidad Estricta)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -15,19 +15,22 @@ const REQUIRED_LIBS = {
 function checkDependencies() {
     const missing = [];
     for (const [globalName, label] of Object.entries(REQUIRED_LIBS)) {
-        if (typeof window[globalName] === 'undefined') {
+        // jsPDF a veces se carga como window.jspdf o window.jsPDF
+        if (typeof window[globalName] === 'undefined' && globalName !== 'jspdf') {
+            missing.push(label);
+        } else if (globalName === 'jspdf' && typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
             missing.push(label);
         }
     }
     const alertEl = document.getElementById('cdn-alert');
     const alertText = document.getElementById('cdn-alert-text');
-    if (!alertEl || !alertText) return false;
-    if (missing.length > 0) {
+    
+    if (alertEl && alertText && missing.length > 0) {
         alertEl.classList.remove('hidden');
-        alertText.textContent = 'Faltan librerías: ' + missing.join(', ') + '. Verifica tu conexión a internet y recarga la página.';
+        alertText.textContent = 'Faltan librerías o cargan lento: ' + missing.join(', ') + '. El sistema intentará funcionar de todos modos.';
         return false;
     }
-    alertEl.classList.add('hidden');
+    if (alertEl) alertEl.classList.add('hidden');
     return true;
 }
 
@@ -111,13 +114,13 @@ function updateFileListUI() {
     listEl.innerHTML = '';
     if (archivosDetectados.length === 0) {
         fileList.classList.add('hidden');
-        DOM['status-text'].innerHTML = 'Esperando archivos...';
+        if (DOM['status-text']) DOM['status-text'].innerHTML = 'Esperando archivos...';
         return;
     }
 
     fileList.classList.remove('hidden');
     DOM['file-count'].textContent = archivosDetectados.length;
-    DOM['status-text'].innerHTML = archivosDetectados.length + ' archivo(s) listos para evaluar.';
+    if (DOM['status-text']) DOM['status-text'].innerHTML = archivosDetectados.length + ' archivo(s) listos para evaluar.';
 
     let cPDF = 0, cDOCX = 0, cZIP = 0;
     archivosDetectados.forEach(f => {
@@ -254,12 +257,14 @@ async function extractTextFromPDF(file) {
         fullText += textContent.items.map(item => item.str).join(' ') + ' ';
         page.cleanup();
 
-        DOM['status-text'].innerHTML =
-            '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
-            '<span>Leyendo: <strong>' + escapeHTML(file.name.substring(0, 25)) + '...</strong></span>' +
-            '<span>Página ' + i + ' de ' + pdf.numPages + '</span>' +
-            '<progress value="' + i + '" max="' + pdf.numPages + '" style="width:100%;height:6px;border-radius:3px;"></progress>' +
-            '</div>';
+        if (DOM['status-text']) {
+            DOM['status-text'].innerHTML =
+                '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
+                '<span>Leyendo: <strong>' + escapeHTML(file.name.substring(0, 25)) + '...</strong></span>' +
+                '<span>Página ' + i + ' de ' + pdf.numPages + '</span>' +
+                '<progress value="' + i + '" max="' + pdf.numPages + '" style="width:100%;height:6px;border-radius:3px;"></progress>' +
+                '</div>';
+        }
         await yieldUI();
     }
 
@@ -270,12 +275,14 @@ async function extractTextFromPDF(file) {
 
 async function extractTextFromDOCX(file) {
     let arrayBuffer = await file.arrayBuffer();
-    DOM['status-text'].innerHTML =
-        '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
-        '<span>Leyendo: <strong>' + escapeHTML(file.name.substring(0, 25)) + '...</strong></span>' +
-        '<span>Extrayendo DOCX...</span>' +
-        '<progress style="width:100%;height:6px;border-radius:3px;"></progress>' +
-        '</div>';
+    if (DOM['status-text']) {
+        DOM['status-text'].innerHTML =
+            '<div style="display:flex;flex-direction:column;gap:4px;margin-top:5px;font-size:0.9em;">' +
+            '<span>Leyendo: <strong>' + escapeHTML(file.name.substring(0, 25)) + '...</strong></span>' +
+            '<span>Extrayendo DOCX...</span>' +
+            '<progress style="width:100%;height:6px;border-radius:3px;"></progress>' +
+            '</div>';
+    }
     await yieldUI();
     let result = await mammoth.extractRawText({ arrayBuffer });
     let text = result.value;
@@ -326,7 +333,7 @@ const DICCIONARIO = {
             'seguridad y salud', 'compensacion por tiempo',
             'asignacion familiar', 'participacion en utilidades',
             'descanso vacacional', 'horas extras', 'riesgos laborales',
-            'seguro de vida ley'
+            'seguro de vida ley', 'beneficios laborales', 'pago de gratificaciones'
         ]
     },
     T2: {
@@ -354,19 +361,19 @@ const DICCIONARIO = {
     NARRATIVA_CASO: {
         actores: [
             'el trabajador', 'la trabajadora', 'empleador', 'la empresa',
-            'demandante', 'gerente', 'practicante', 'victima', 'sindicato'
+            'demandante', 'gerente', 'practicante', 'victima', 'sindicato', 'obrero'
         ],
         // C2 requiere una vulneración explícita
         conflictos: [
             'despidio', 'incumplio', 'vulnero', 'sufrio', 'acoso', 
             'accidento', 'omitio', 'afecto', 'obligo', 'coacciono', 
-            'no pago', 'accidente de trabajo', 'fallecio'
+            'no pago', 'accidente de trabajo', 'fallecio', 'infraccion'
         ],
         // C2 requiere un desenlace formal o denuncia evidenciable
         consecuencias: [
             'demando', 'sanciono', 'reclamo', 'denuncio', 'multo', 
             'sunafil', 'tribunal constitucional', 'corte suprema', 
-            'expediente', 'casacion', 'resolucion', 'sentencia', 'inspeccion'
+            'expediente', 'casacion', 'resolucion', 'sentencia', 'inspeccion', 'queja'
         ]
     }
 };
@@ -411,7 +418,7 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // Dividir en bloques densos para evitar que frases sueltas formen casos falsos
+    // Dividir en bloques densos para medir densidad y proximidad
     const bloques = text
         .split(/(?:\r?\n){2,}|\.\s+/)
         .map(function(p) { return normalizeText(p); })
@@ -430,6 +437,7 @@ function evaluateContent(fileName, text) {
         const esT3 = DICCIONARIO.T3.normas.some(kw => bloque.includes(kw)) ||
                      DICCIONARIO.T3.conceptos.some(kw => bloque.includes(kw));
 
+        // Filtro de densidad para C1
         if (esT1) palabrasT1 += palabrasEnBloque;
         if (esT2) palabrasT2 += palabrasEnBloque;
         if (esT3) palabrasT3 += palabrasEnBloque;
@@ -439,16 +447,19 @@ function evaluateContent(fileName, text) {
         const tieneConflicto = DICCIONARIO.NARRATIVA_CASO.conflictos.some(kw => bloque.includes(kw));
         const tieneConsecuencia = DICCIONARIO.NARRATIVA_CASO.consecuencias.some(kw => bloque.includes(kw));
 
-        // Para validar un caso, el relato debe cruzar obligatoriamente el hecho y la evidencia formal/acción.
-        if (tieneActor && (tieneConflicto || tieneConsecuencia)) {
+        // Condición Minuciosa: Un caso real debe mencionar un actor + un conflicto evidente. 
+        // O debe apoyarse explícitamente en una entidad formal (Sunafil, expediente, etc).
+        const esCasoReal = (tieneActor && tieneConflicto) || tieneConsecuencia;
+
+        if (esCasoReal) {
             if (esT1) hasT1_Case = true;
             if (esT2) hasT2_Case = true;
             if (esT3) hasT3_Case = true;
         }
     });
 
-    // ─── CRITERIO 1 (Normativa Estricta) ───
-    const UMBRAL_PALABRAS = 45; // Aumentado para evitar temas "muy cortitos"
+    // ─── CRITERIO 1 (Normativa Estricta: Filtro Anti-Andreas) ───
+    const UMBRAL_PALABRAS = 45; // Requiere que el contexto del tema tenga al menos 45 palabras reales.
     const hasT1_Norm = palabrasT1 >= UMBRAL_PALABRAS;
     const hasT2_Norm = palabrasT2 >= UMBRAL_PALABRAS;
     const hasT3_Norm = palabrasT3 >= UMBRAL_PALABRAS;
@@ -519,6 +530,7 @@ function evaluateContent(fileName, text) {
     const biblioDetalle = hasAPA ? 'Fuentes verificables' : 'Sin fuentes estructuradas';
 
     const ausencias = [];
+    // Especificamos si fue ausente total, o si fue "Insuficiente" (muy cortito)
     if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 (Insuficiente)' : 'T1 (Ausente)');
     if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 (Insuficiente)' : 'T2 (Ausente)');
     if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3 (Insuficiente)' : 'T3 (Ausente)');
@@ -798,7 +810,7 @@ function exportCSV() {
 
 // ─── Exportación PDF ───
 function exportPDF() {
-    if (resultadosEvaluacion.length === 0) return;
+    if (resultadosEvaluacion.length === 0 || !window.jspdf) return;
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
 
     doc.setFontSize(16);
@@ -838,7 +850,7 @@ function exportPDF() {
     doc.save('Reporte_Consolidado_Evaluaciones.pdf');
 }
 
-// ─── Configuración de Eventos ───
+// ─── Configuración de Eventos (AHORA SE EJECUTA SIEMPRE) ───
 function setupEvents() {
     var dz = DOM['drop-zone'];
     if (dz) {
@@ -943,4 +955,25 @@ function setupEvents() {
     }
 
     setupSortableHeaders();
+}
+
+// ─── Inicialización Segura ───
+function init() {
+    cacheDOM();
+    
+    // CRÍTICO: Vincular los eventos de inmediato para evitar que la página "muera".
+    setupEvents(); 
+    
+    // Luego se validan las dependencias (mostrará alerta si hay fallas, pero no romperá la UI)
+    checkDependencies();
+    configurePDFJS();
+    
+    // Cargar historial previo
+    loadState();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
 }
