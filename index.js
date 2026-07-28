@@ -1,5 +1,6 @@
 /* ============================================================
-   index.js — Motor de Evaluación Heurístico Determinista v8.0
+   index.js — Motor de Evaluación Heurístico Determinista v9.0
+   Análisis Narrativo Continuo e Integrado (C1, C2 y C3)
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -76,8 +77,40 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE EVALUACIÓN
+// MOTOR DE NAVEGACIÓN Y ANÁLISIS DE CONTEXTO NARRATIVO
 // ═══════════════════════════════════════════════════════════
+
+// Diccionarios contextuales por Temas
+const VOCABULARIO_TEMATICO = {
+    T1: {
+        normas: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'ds 005 2012 tr', 'ley 25129', 'ley 26790', 'ley 30056'],
+        conceptos: ['seguridad y salud en el trabajo', 'cts', 'compensacion por tiempo', 'gratificaciones', 'asignacion familiar', 'participacion de utilidades', 'descanso vacacional', 'horas extras', 'prevencion de riesgos', 'seguro de vida ley']
+    },
+    T2: {
+        normas: ['ley 27942', 'convenio 190', 'ds 014 2019 mimp', 'ley 31156', 'dl 1410'],
+        conceptos: ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada']
+    },
+    T3: {
+        normas: ['ley 28518', 'ds 011 2012 tr', 'ley 31396'],
+        conceptos: ['modalidad formativa', 'modalidades formativas', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'subvencion economica', 'facilidades horarias']
+    }
+};
+
+const INDICADORES_CASO = {
+    actores: ['trabajador', 'empleador', 'empresa', 'colaborador', 'demandante', 'gerente', 'jefe', 'practicante', 'victima', 'inspector', 'sindicato'],
+    acciones: ['despidio', 'incumplio', 'vulnero', 'demando', 'sanciono', 'sufrio', 'acoso', 'accidento', 'omitio', 'reclamo', 'sancionaron', 'denuncio', 'multo'],
+    fuentes: ['sunafil', 'el peruano', 'tribunal constitucional', 'corte suprema', 'expediente', 'casacion', 'resolucion', 'sentencia', 'multa', 'denuncia ante', 'inspeccion']
+};
+
+function splitInNarrativeBlocks(text) {
+    const normText = normalizeText(text);
+    let parrafos = text.split(/(?:\r?\n){2,}/).map(function(p) { return normalizeText(p); }).filter(function(p) { return p.length > 80; });
+    if (parrafos.length === 0) {
+        parrafos = normText.match(/.{1,350}(?:\s|$)/g) || [normText];
+    }
+    return parrafos;
+}
+
 function evaluateContent(fileName, text) {
     const wordCount = text ? text.trim().split(/\s+/).filter(function(w) { return w.match(/[a-z0-9]/i); }).length : 0;
     const estudiante = extractStudentIdentity(fileName, text);
@@ -90,116 +123,102 @@ function evaluateContent(fileName, text) {
             c2: 0, c2Checks: [false, false, false],
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Ausenta: Contenido mínimo. | Por fortalecer: Documento en blanco o insuficiente.'
+            observacion: 'Ausenta: Contenido mínimo. Documento en blanco o insuficiente.'
         };
     }
 
-    let rawBlocks = text.split(/(?:\r?\n){2,}|\.\s+/).map(function(b) { return normalizeText(b); }).filter(function(b) { return b.length > 30; });
-    if (rawBlocks.length === 0) rawBlocks = [normText];
+    const bloques = splitInNarrativeBlocks(text);
 
-    const regexT1 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|norma).{0,12}(27735|25129|26790|29783|30056|650|713|892|688|854)/;
-    const t1Compounds = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'participacion de utilidades', 'seguridad y salud en el trabajo', 'prevencion de riesgos laborales', 'descanso vacacional', 'horas extras'];
-
-    const regexT2 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|convenio).{0,12}(27942|1410|014 2019|190)/;
-    const t2Compounds = ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'violencia sexual', 'conducta no deseada'];
-
-    const regexT3 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo).{0,12}(28518|011 2012|31396)/;
-    const t3Compounds = ['modalidad formativa', 'modalidades formativas', 'facilidades horarias', 'flexibilidad horaria', 'practicas preprofesionales', 'practicas profesionales', 'jornada formativa'];
-
-    const formalEvidenceKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'mtpe', 'corte suprema', 'jurisprudencia', 'casacion', 'expediente', 'multa impuesta'];
-    const narrativeActorKw = ['la empresa', 'el empleador', 'trabajador', 'colaborador', 'gerente', 'jefe', 'organizacion', 'compañia', 'recursos humanos', 'personal'];
-    const narrativeActionKw = ['vulnero', 'vulneracion', 'incumplio', 'incumplimiento', 'obligo', 'afecto', 'accidente', 'despido', 'queja', 'reclamo', 'infraccion', 'abuso', 'denuncio'];
-
-    function hasT1InBlock(b) {
-        return regexT1.test(b) || t1Compounds.filter(function(kw) { return b.includes(kw); }).length >= 2;
-    }
-    function hasT2InBlock(b) {
-        return regexT2.test(b) || t2Compounds.filter(function(kw) { return b.includes(kw); }).length >= 2;
-    }
-    function hasT3InBlock(b) {
-        return regexT3.test(b) || t3Compounds.filter(function(kw) { return b.includes(kw); }).length >= 1;
-    }
-    function hasCaseInBlock(b) {
-        const hasFormal = formalEvidenceKw.some(function(kw) { return b.includes(kw); });
-        const hasNarrative = narrativeActorKw.some(function(kw) { return b.includes(kw); }) && narrativeActionKw.some(function(kw) { return b.includes(kw); });
-        return hasFormal || hasNarrative;
+    // ─── CRITERIO 1: ANÁLISIS NORMATIVO Y CONCEPTUAL (C1) ───
+    function checkNormativePresence(topicKey) {
+        const topic = VOCABULARIO_TEMATICO[topicKey];
+        const tieneNormaDirecta = topic.normas.some(function(n) { return normText.includes(n); });
+        const coincidenciaConceptos = topic.conceptos.filter(function(c) { return normText.includes(c); }).length;
+        return tieneNormaDirecta || coincidenciaConceptos >= 2;
     }
 
-    const hasT1 = rawBlocks.some(hasT1InBlock) || regexT1.test(normText);
-    const hasT2 = rawBlocks.some(hasT2InBlock) || regexT2.test(normText);
-    const hasT3 = rawBlocks.some(hasT3InBlock) || regexT3.test(normText);
+    const hasT1_Norm = checkNormativePresence('T1');
+    const hasT2_Norm = checkNormativePresence('T2');
+    const hasT3_Norm = checkNormativePresence('T3');
 
-    const c1Checks = [hasT1, hasT2, hasT3];
+    const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
     const c1Puntos = c1Checks.filter(Boolean).length * 2;
 
-    const hasC1_Case = rawBlocks.some(function(b) { return hasT1InBlock(b) && hasCaseInBlock(b); });
-    const hasC2_Case = rawBlocks.some(function(b) { return hasT2InBlock(b) && hasCaseInBlock(b); });
-    const hasC3_Case = rawBlocks.some(function(b) { return hasT3InBlock(b) && hasCaseInBlock(b); });
+    // ─── CRITERIO 2: DESARROLLO DE CASOS REALES / PRÁCTICOS (C2) ───
+    function checkCaseNarrative(bloque, topicKey) {
+        const topic = VOCABULARIO_TEMATICO[topicKey];
+        const tieneTema = topic.normas.some(function(n) { return bloque.includes(n); }) || 
+                          topic.conceptos.some(function(c) { return bloque.includes(c); });
+        
+        if (!tieneTema) return false;
 
-    const c2Checks = [hasC1_Case, hasC2_Case, hasC3_Case];
+        const tieneFuente = INDICADORES_CASO.fuentes.some(function(f) { return bloque.includes(f); });
+        const tieneActor = INDICADORES_CASO.actores.some(function(a) { return bloque.includes(a); });
+        const tieneAccion = INDICADORES_CASO.acciones.some(function(ac) { return bloque.includes(ac); });
+
+        return tieneFuente || (tieneActor && tieneAccion);
+    }
+
+    const hasT1_Case = bloques.some(function(b) { return checkCaseNarrative(b, 'T1'); });
+    const hasT2_Case = bloques.some(function(b) { return checkCaseNarrative(b, 'T2'); });
+    const hasT3_Case = bloques.some(function(b) { return checkCaseNarrative(b, 'T3'); });
+
+    const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
     const c2Puntos = c2Checks.filter(Boolean).length * 2;
 
-    const p1Kw = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'valor inherente', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
-    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa'];
-    const p3Kw = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'solo se debe cumplir', 'situacion aislada'];
+    // ─── CRITERIO 3: REFLEXIÓN ÉTICA Y POSTURA CRÍTICA (C3) ───
+    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
+    const kwLegalista = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa'];
+    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'situacion aislada'];
 
-    const p1Hits = p1Kw.filter(function(kw) { return normText.includes(kw); }).length;
-    const p2Hits = p2Kw.filter(function(kw) { return normText.includes(kw); }).length;
-    const p3Hits = p3Kw.filter(function(kw) { return normText.includes(kw); }).length;
+    const hitHumanista = kwHumanista.filter(function(k) { return normText.includes(k); }).length;
+    const hitLegalista = kwLegalista.filter(function(k) { return normText.includes(k); }).length;
+    const hitDeficiente = kwDeficiente.filter(function(k) { return normText.includes(k); }).length;
 
     let c3Puntos = 0;
     let stanceMsg = '';
     let c3Checks = [false, false, false];
 
-    if (p3Hits > 0) {
+    if (hitDeficiente > 0) {
         c3Puntos = 0;
-        stanceMsg = 'Postura Deficiente (justifica o normaliza malas prácticas)';
+        stanceMsg = 'Postura Deficiente (normaliza o justifica malas prácticas)';
         c3Checks = [true, false, false];
-    } else if (p1Hits > 0) {
+    } else if (hitHumanista >= 2) {
         if (c1Puntos === 6 && c2Puntos === 6) {
             c3Puntos = 8;
-            stanceMsg = 'Postura Ética Humana Impecable (Análisis y evidencias completos al 100%)';
+            stanceMsg = 'Postura Ética Humana Impecable (Análisis y casos completos al 100%)';
             c3Checks = [true, true, true];
         } else if (c1Puntos >= 4 && c2Puntos >= 4) {
             c3Puntos = 6;
-            stanceMsg = 'Postura Ética Humana Buena (Penalizada levemente por omisión de 1 tema o 1 caso)';
+            stanceMsg = 'Postura Ética Humana Buena (Con pequeñas omisiones temáticas)';
             c3Checks = [true, true, false];
         } else {
             c3Puntos = 4;
-            stanceMsg = 'Postura Ética Humana Parcial (Existen vacíos graves en normativas o casos)';
+            stanceMsg = 'Postura Ética Humana Parcial (Desbalance en cobertura de casos o normas)';
             c3Checks = [true, false, false];
         }
-    } else if (p2Hits > 0) {
+    } else if (hitLegalista >= 2) {
         c3Puntos = 4;
-        stanceMsg = 'Postura Legalista-Corporativa (Enfocada en evitar multas y riesgos corporativos)';
+        stanceMsg = 'Postura Legalista (Enfocada en evitar multas y contingencias)';
         c3Checks = [true, false, false];
     } else {
         c3Puntos = 0;
-        stanceMsg = 'No se evidencia reflexión crítica clara ni postura personal';
+        stanceMsg = 'Sin reflexión crítica ni postura personal evidenciada';
     }
 
-    let fortalezasExtra = [];
+    // ─── FORMATO Y DIAGNÓSTICO SINTÉTICO ───
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
-    if (!hasAPA) fortalezasExtra.push('Formato APA (citas/referencias)');
+    
+    const ausencias = [];
+    if (!hasT1_Norm) ausencias.push('Norma T1 (SST/Derechos)');
+    if (!hasT2_Norm) ausencias.push('Norma T2 (Hostigamiento)');
+    if (!hasT3_Norm) ausencias.push('Norma T3 (Modalidades Formativas)');
+    if (!hasT1_Case) ausencias.push('Caso Real T1');
+    if (!hasT2_Case) ausencias.push('Caso Real T2');
+    if (!hasT3_Case) ausencias.push('Caso Real T3');
 
-    const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
-    if (conectores.filter(function(c) { return normText.includes(c); }).length < 3) fortalezasExtra.push('Uso de conectores lógicos argumentativos');
-
-    const ausentaArr = [];
-    if (!hasT1) ausentaArr.push('T1 (Norma)');
-    if (!hasT2) ausentaArr.push('T2 (Norma)');
-    if (!hasT3) ausentaArr.push('T3 (Norma)');
-    if (!hasC1_Case && hasT1) ausentaArr.push('Caso Real T1');
-    if (!hasC2_Case && hasT2) ausentaArr.push('Caso Real T2');
-    if (!hasC3_Case && hasT3) ausentaArr.push('Caso Real T3');
-
-    let diagnostico = 'Ausenta: ' + (ausentaArr.length > 0 ? ausentaArr.join(', ') : 'Desarrollo completo (0 omisiones)') + '. | ';
-    diagnostico += 'Ética: ' + stanceMsg;
-    if (fortalezasExtra.length > 0) {
-        diagnostico += ' | Por mejorar formato: ' + fortalezasExtra.join(', ') + '.';
-    } else {
-        diagnostico += '.';
-    }
+    let diagnostico = 'Ausenta: ' + (ausencias.length > 0 ? ausencias.join(', ') : 'Ninguna omisión tematica') + '. | ';
+    diagnostico += 'Ética: ' + stanceMsg + '.';
 
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
 
@@ -215,10 +234,10 @@ function evaluateContent(fileName, text) {
     };
 }
 
-// ─── EXTRACTION FUNCTIONS WITH CDN GUARD ───
+// ─── EXTRACCIÓN CON PROTECCIÓN CDN ───
 async function extractTextFromPDF(file) {
     if (typeof pdfjsLib === 'undefined') {
-        throw new Error('Falta la librería PDF.js en el HTML. Agrega <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>');
+        throw new Error('PDF.js no está cargado.');
     }
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -233,7 +252,7 @@ async function extractTextFromPDF(file) {
 
 async function extractTextFromDOCX(file) {
     if (typeof mammoth === 'undefined') {
-        throw new Error('Falta la librería Mammoth.js en el HTML. Agrega <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>');
+        throw new Error('Mammoth.js no está cargado.');
     }
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
@@ -242,7 +261,7 @@ async function extractTextFromDOCX(file) {
 
 async function extractFilesFromZip(zipFile) {
     if (typeof JSZip === 'undefined') {
-        throw new Error('Falta la librería JSZip en el HTML. Agrega <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>');
+        throw new Error('JSZip no está cargado.');
     }
     const extracted = [];
     const zip = await JSZip.loadAsync(zipFile);
@@ -262,7 +281,7 @@ async function extractFilesFromZip(zipFile) {
     return extracted;
 }
 
-// ─── PROCESAMIENTO AUTOMÁTICO EN LOTE ───
+// ─── PROCESAMIENTO EN LOTE ───
 async function processAllFiles() {
     if (isProcessing || archivosDetectados.length === 0) return;
 
@@ -329,7 +348,7 @@ async function processAllFiles() {
     }
 }
 
-// ─── RENDERIZADO EN TABLA ───
+// ─── INTERFAZ Y RENDERIZADO ───
 function renderPill(label, isOk) {
     if (!isOk) return '';
     return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
@@ -518,7 +537,7 @@ function exportPDF() {
     doc.save('Evaluaciones_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
-// ─── INICIALIZACIÓN Y EVENT LISTENERS ───
+// ─── INICIALIZACIÓN ───
 document.addEventListener('DOMContentLoaded', function() {
     cacheDOM();
 
@@ -528,14 +547,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const drop = DOM['drop-zone'];
     if (drop) {
-        // Permitir abrir explorador con clic en drop-zone
         drop.addEventListener('click', function(e) {
             if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
                 if (DOM['file-input']) DOM['file-input'].click();
             }
         });
 
-        // Eventos Drag and Drop
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(e) {
             drop.addEventListener(e, function(ev) { 
                 ev.preventDefault(); 
@@ -559,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (DOM['file-input']) {
-        DOM['file-input'].addEventListener('change', function(ev) {
+        DOM['file-input'].addEventListener('change', function() {
             if (this.files && this.files.length > 0) {
                 addFilesToList(this.files);
                 this.value = '';
@@ -568,7 +585,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (DOM['folder-input']) {
-        DOM['folder-input'].addEventListener('change', function(ev) {
+        DOM['folder-input'].addEventListener('change', function() {
             if (this.files && this.files.length > 0) {
                 addFilesToList(this.files);
                 this.value = '';
