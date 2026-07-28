@@ -1,7 +1,7 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
    Procesamiento en Fila India | Memoria Optimizada | Rúbrica 0-20
-   (FORTALECIDO: Retorno de Etiquetas T1/T2/T3 y Desbloqueo)
+   (FORTALECIDO: Filtros Minuciosos, UI Desbloqueada y Pastillas Grises/Verdes)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -23,14 +23,14 @@ function checkDependencies() {
     }
     const alertEl = document.getElementById('cdn-alert');
     const alertText = document.getElementById('cdn-alert-text');
-    if (!alertEl || !alertText) return false;
-    
-    if (missing.length > 0) {
-        alertEl.classList.remove('hidden');
-        alertText.textContent = 'Faltan librerías: ' + missing.join(', ') + '. El sistema intentará funcionar de todos modos.';
-        return false;
+    if (alertEl && alertText) {
+        if (missing.length > 0) {
+            alertEl.classList.remove('hidden');
+            alertText.textContent = 'Faltan librerías: ' + missing.join(', ') + '. El sistema intentará funcionar de todos modos.';
+            return false;
+        }
+        alertEl.classList.add('hidden');
     }
-    alertEl.classList.add('hidden');
     return true;
 }
 
@@ -114,13 +114,13 @@ function updateFileListUI() {
     listEl.innerHTML = '';
     if (archivosDetectados.length === 0) {
         fileList.classList.add('hidden');
-        if(DOM['status-text']) DOM['status-text'].innerHTML = 'Esperando archivos...';
+        if (DOM['status-text']) DOM['status-text'].innerHTML = 'Esperando archivos...';
         return;
     }
 
     fileList.classList.remove('hidden');
     DOM['file-count'].textContent = archivosDetectados.length;
-    if(DOM['status-text']) DOM['status-text'].innerHTML = archivosDetectados.length + ' archivo(s) listos para evaluar.';
+    if (DOM['status-text']) DOM['status-text'].innerHTML = archivosDetectados.length + ' archivo(s) listos para evaluar.';
 
     let cPDF = 0, cDOCX = 0, cZIP = 0;
     archivosDetectados.forEach(f => {
@@ -333,7 +333,7 @@ const DICCIONARIO = {
             'seguridad y salud', 'cts', 'compensacion por tiempo',
             'gratificacion', 'asignacion familiar', 'utilidades',
             'descanso vacacional', 'horas extras', 'riesgos laborales',
-            'seguro de vida ley'
+            'seguro de vida ley', 'beneficios sociales'
         ]
     },
     T2: {
@@ -416,11 +416,11 @@ function evaluateContent(fileName, text) {
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount,
             bibliografia: { ok: false, detalle: 'Sin contenido suficiente' },
-            observacion: 'Ausenta: Contenido mínimo. Documento insuficiente o vacío.'
+            observacion: 'Documento vacío o con contenido insuficiente para ser evaluado.'
         };
     }
 
-    // Dividir en bloques para medir densidad real y proximidad de casos
+    // Dividir en bloques (párrafos) para evaluar proximidad
     const bloques = text
         .split(/(?:\r?\n){2,}|\.\s+/)
         .map(function(p) { return normalizeText(p); })
@@ -444,7 +444,6 @@ function evaluateContent(fileName, text) {
         if (esT2) palabrasT2 += palabrasEnBloque;
         if (esT3) palabrasT3 += palabrasEnBloque;
 
-        // Detección Narrativa de Casos
         const tieneActor = DICCIONARIO.NARRATIVA_CASO.actores.some(kw => bloque.includes(kw));
         const tieneConflicto = DICCIONARIO.NARRATIVA_CASO.conflictos.some(kw => bloque.includes(kw));
         const tieneContextoLegal = DICCIONARIO.NARRATIVA_CASO.contextoLegal.some(kw => bloque.includes(kw));
@@ -457,21 +456,22 @@ function evaluateContent(fileName, text) {
     });
 
     // ─── CRITERIO 1: Filtro de Densidad Anti-Insuficiencia ───
-    const UMBRAL_PALABRAS = 45;
+    const UMBRAL_PALABRAS = 45; // Mínimo de palabras en el contexto del tema
     const hasT1_Norm = palabrasT1 >= UMBRAL_PALABRAS;
     const hasT2_Norm = palabrasT2 >= UMBRAL_PALABRAS;
     const hasT3_Norm = palabrasT3 >= UMBRAL_PALABRAS;
 
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
-    const c1Puntos = c1Checks.filter(Boolean).length * 2;
+    const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
     // ─── CRITERIO 2: Efecto Dominó en Casos Reales ───
+    // El caso no es válido si la teoría fue insuficiente
     const c2Checks = [
         hasT1_Case && hasT1_Norm, 
         hasT2_Case && hasT2_Norm, 
         hasT3_Case && hasT3_Norm
     ];
-    const c2Puntos = c2Checks.filter(Boolean).length * 2;
+    const c2Puntos = c2Checks.filter(Boolean).length * 2; 
 
     // ─── CRITERIO 3: Ética Escalonada ───
     const kwHumanista = [
@@ -494,24 +494,30 @@ function evaluateContent(fileName, text) {
 
     let c3Puntos = 0;
     let stanceMsg = '';
+    let c3Checks = [false, false, false];
 
     if (hitDeficiente > 0) {
         c3Puntos = 0;
         stanceMsg = 'Ética Deficiente (justifica malas prácticas)';
+        c3Checks = [true, false, false];
     } else if (hitHumanista >= 2) {
         if (c1Puntos === 6 && c2Puntos === 6) {
             c3Puntos = 8;
             stanceMsg = 'Ética Impecable (Desarrollo completo)';
+            c3Checks = [true, true, true];
         } else if (c1Puntos >= 4 && c2Puntos >= 4) {
             c3Puntos = 6;
             stanceMsg = 'Ética Buena (Presenta omisiones temáticas)';
+            c3Checks = [true, true, false];
         } else {
             c3Puntos = 4;
             stanceMsg = 'Ética Parcial (Vacíos graves en normas o casos)';
+            c3Checks = [true, false, false];
         }
     } else if (hitLegalista >= 2) {
         c3Puntos = 4;
         stanceMsg = 'Ética Legalista (Enfocada en evitar multas)';
+        c3Checks = [true, false, false];
     } else {
         c3Puntos = 0;
         stanceMsg = 'Sin reflexión crítica clara';
@@ -521,19 +527,21 @@ function evaluateContent(fileName, text) {
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
     const biblioDetalle = hasAPA ? 'Fuentes verificables' : 'Sin fuentes estructuradas';
 
-    // ─── DIAGNÓSTICO SINTÉTICO ───
+    // ─── DIAGNÓSTICO SINTÉTICO (Solo muestra lo ausente) ───
     const ausencias = [];
-    if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 (Insuficiente)' : 'T1 (Ausente)');
-    if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 (Insuficiente)' : 'T2 (Ausente)');
-    if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3 (Insuficiente)' : 'T3 (Ausente)');
+    if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 (Insuficiente)' : 'T1');
+    if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 (Insuficiente)' : 'T2');
+    if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3 (Insuficiente)' : 'T3');
 
-    if (!hasT1_Case && hasT1_Norm) ausencias.push('Caso T1');
-    if (!hasT2_Case && hasT2_Norm) ausencias.push('Caso T2');
-    if (!hasT3_Case && hasT3_Norm) ausencias.push('Caso T3');
+    if (!c2Checks[0] && hasT1_Norm) ausencias.push('Caso T1');
+    if (!c2Checks[1] && hasT2_Norm) ausencias.push('Caso T2');
+    if (!c2Checks[2] && hasT3_Norm) ausencias.push('Caso T3');
 
-    let diagnostico = 'Observaciones: ' +
-        (ausencias.length > 0 ? ausencias.join(', ') : 'Ninguna omisión') +
-        '. | ' + stanceMsg + '.';
+    let diagnostico = '';
+    if (ausencias.length > 0) {
+        diagnostico += 'Falta desarrollar: ' + ausencias.join(', ') + '. | ';
+    }
+    diagnostico += stanceMsg + '.';
 
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
 
@@ -541,7 +549,7 @@ function evaluateContent(fileName, text) {
         estudiante: estudiante,
         c1: c1Puntos, c1Checks: c1Checks,
         c2: c2Puntos, c2Checks: c2Checks,
-        c3: c3Puntos, c3Checks: [], // Reservado para uso futuro
+        c3: c3Puntos, c3Checks: c3Checks,
         notaFinal: notaFinal,
         wordCount: wordCount,
         bibliografia: { ok: hasAPA, detalle: biblioDetalle },
@@ -650,10 +658,13 @@ async function processAllFiles() {
     }
 }
 
-// ─── Funciones Auxiliares para UI de la Tabla ───
+// ─── Creador de Pastillas (Verde si True, Gris si False) ───
 function renderPill(label, isOk) {
-    if (!isOk) return '';
-    return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
+    if (isOk) {
+        return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
+    } else {
+        return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#f3f4f6; color:#9ca3af; border:1px solid #d1d5db;">' + label + '</span>';
+    }
 }
 
 function renderScoreBadge(score, max) {
@@ -672,7 +683,7 @@ function renderFinalBadge(nota) {
     return '<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:' + bg + ';">' + nota + ' / 20</span>';
 }
 
-// ─── Renderizado de Tabla (RESTAURADO CON PASTILLAS T1, T2, T3) ───
+// ─── Renderizado de Tabla ───
 function renderTable(filterText) {
     const tbody = DOM['table-body'];
     if (!tbody) return;
@@ -707,26 +718,23 @@ function renderTable(filterText) {
     }
 
     filtrados.forEach(function(r) {
-        const idx = resultadosEvaluacion.indexOf(r) + 1;
-        const bibIcon = r.bibliografia && r.bibliografia.ok 
-            ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ APA OK</span>' 
-            : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
-        const biblioTitle = r.bibliografia ? escapeHTML(r.bibliografia.detalle) : '';
+        var idx = resultadosEvaluacion.indexOf(r) + 1;
+        var badgeClass = r.notaFinal >= 14 ? 'badge-success' : (r.notaFinal >= 11 ? 'badge-warning' : 'badge-danger');
+        var biblioIcon = r.bibliografia && r.bibliografia.ok ? '✅' : '❌';
+        var biblioTitle = r.bibliografia ? escapeHTML(r.bibliografia.detalle) : '';
 
-        // Restauración de las Pastillas (Pills) Verdes
-        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
+        // Generación de Pastillas Verdes o Grises
+        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]);
+        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]);
         
-        let c3Pills = '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        if (r.c3 === 8) c3Pills = renderPill('Óptimo (8p)', true);
-        else if (r.c3 === 6) c3Pills = renderPill('Bueno (6p)', true);
-        else if (r.c3 === 4) c3Pills = renderPill('Parcial/Legal (4p)', true);
-        else if (r.c3 === 0 && r.c3Checks && r.c3Checks[0]) c3Pills = renderPill('Deficiente (0p)', true);
+        let c3Pills = '';
+        if (r.c3 === 8) c3Pills = renderPill('Óptimo', true);
+        else if (r.c3 === 6) c3Pills = renderPill('Bueno', true);
+        else if (r.c3 === 4) c3Pills = renderPill('Parcial', true);
+        else c3Pills = renderPill('Deficiente', false);
 
-        const tr = document.createElement('tr');
-        
-        // Uso estricto de concatenación para evitar errores de sintaxis
-        tr.innerHTML = 
+        var tr = document.createElement('tr');
+        tr.innerHTML =
             '<td style="text-align:center; font-weight:600; color:#6b7280; font-size:0.85rem;">' + idx + '</td>' +
             '<td style="font-weight:600; color:#111827; font-size:0.85rem;">' + escapeHTML(r.estudiante) + '</td>' +
             '<td style="text-align:center;">' + renderScoreBadge(r.c1, 6) + '<br><div style="margin-top:3px;">' + c1Pills + '</div></td>' +
@@ -740,7 +748,6 @@ function renderTable(filterText) {
                    escapeHTML(r.observacion) + 
                 '</div>' +
             '</td>';
-            
         tbody.appendChild(tr);
     });
 }
@@ -882,7 +889,7 @@ function exportPDF() {
     doc.save('Reporte_Consolidado_Evaluaciones.pdf');
 }
 
-// ─── Configuración de Eventos (AHORA SE ACTIVA SIEMPRE) ───
+// ─── Configuración de Eventos ───
 function setupEvents() {
     var dz = DOM['drop-zone'];
     if (dz) {
@@ -993,12 +1000,14 @@ function setupEvents() {
 function init() {
     cacheDOM();
     
-    // CRÍTICO: Activamos los eventos ANTES de verificar el internet.
-    // Así tu página nunca "muere" ni se congela el drag & drop.
+    // Configurar eventos PRIMERO para evitar que la interfaz muera
     setupEvents(); 
     
+    // Luego chequear dependencias e intentar configurar
     checkDependencies();
     configurePDFJS();
+    
+    // Restaurar el historial previo
     loadState();
 }
 
