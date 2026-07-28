@@ -1,6 +1,6 @@
 /* ============================================================
-   index.js — Motor de Evaluación Heurístico Determinista v4.0
-   Arquitectura 6-6-8. CANDADOS ESTRICTOS (Cero Falsos Positivos)
+   index.js — Motor de Evaluación Heurístico Determinista v5.0
+   Mapeo Jurídico Integral de Legislación Laboral Peruana
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -29,7 +29,7 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
 }
 
-// Normalizador Estricto: Quita acentos, puntuaciones (para igualar d.l. y dl) y homogeniza espacios
+// Normalizador Estricto: Transforma "Ley N° 29783" en "ley n 29783" para la Regex
 function normalizeText(text) {
     if (!text) return '';
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, ' ');
@@ -71,10 +71,9 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR ESTRICTO: CANDADOS LEGALES (Cero ambigüedad)
+// MOTOR EXPERTO DE EVALUACIÓN (MAPEO JURÍDICO INTEGRAL)
 // ═══════════════════════════════════════════════════════════
 function evaluateContent(fileName, text) {
-    // Conteo de palabras exacto MS Word (solo alfanuméricos)
     const wordCount = text ? text.trim().split(/\s+/).filter(w => w.match(/[a-z0-9]/i)).length : 0;
     
     const estudiante = extractStudentIdentity(fileName, text);
@@ -91,32 +90,34 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // 1. C1: NORMATIVA (Candados Estrictos: Ley explícita o mínimo 2 términos compuestos)
+    // 1. C1: NORMATIVA - CANDADOS LEGALES PERUANOS (Extensivos)
     
-    // Candado T1: Beneficios
-    const hasT1_Law = /(ley 27735|ley 25129|ley 26790|ley 30056|dl 650|d l 650|dl 713|d l 713|dl 892|d l 892|dl 688|d l 688|dl 854|d l 854|decreto legislativo 650|decreto legislativo 713|decreto legislativo 892|decreto legislativo 688|decreto legislativo 854)/.test(normText);
-    const t1Compounds = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'participacion de utilidades', 'beneficios laborales', 'beneficios sociales'];
+    // Universo T1 (Beneficios, CTS, Gratificaciones, Vacaciones, Utilidades, SST, Seguros, MYPE)
+    const regexT1 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|norma).{0,12}(27735|25129|26790|29783|30056|650|713|892|688|854|007 2002)/;
+    const hasT1_Law = regexT1.test(normText);
+    const t1Compounds = ['compensacion por tiempo', 'asignacion familiar', 'seguro de vida ley', 'participacion de utilidades', 'seguridad y salud en el trabajo', 'prevencion de riesgos laborales', 'descanso vacacional', 'horas extras'];
     const hasT1_Comp = t1Compounds.filter(kw => normText.includes(kw)).length >= 2;
     const hasT1 = hasT1_Law || hasT1_Comp;
 
-    // Candado T2: Acoso
-    const hasT2_Law = /(ley 27942|dl 1410|d l 1410|decreto legislativo 1410|ds 014 2019|d s 014 2019|decreto supremo 014 2019)/.test(normText);
-    const t2Compounds = ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'violencia sexual'];
+    // Universo T2 (Acoso, Hostigamiento Sexual, Penalización)
+    const regexT2 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo|convenio).{0,12}(27942|1410|014 2019|190)/;
+    const hasT2_Law = regexT2.test(normText);
+    const t2Compounds = ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'violencia sexual', 'actos de hostilidad', 'conducta no deseada'];
     const hasT2_Comp = t2Compounds.filter(kw => normText.includes(kw)).length >= 2;
     const hasT2 = hasT2_Law || hasT2_Comp;
 
-    // Candado T3: Flexibilidad (Adiós al bug "Andrea Bardales")
-    const hasT3_Law = /(ley 28518|ds 011 2012|d s 011 2012|decreto supremo 011 2012)/.test(normText);
-    const t3Compounds = ['modalidad formativa', 'modalidades formativas', 'facilidades horarias', 'flexibilidad horaria', 'adaptar la jornada'];
-    const hasT3_Comp = t3Compounds.filter(kw => normText.includes(kw)).length >= 1; // Basta 1 compuesto fuerte
+    // Universo T3 (Modalidades Formativas, Flexibilidad para Estudiantes)
+    const regexT3 = /(ley|dl|d l|decreto legislativo|ds|d s|decreto supremo).{0,12}(28518|011 2012|31396)/;
+    const hasT3_Law = regexT3.test(normText);
+    const t3Compounds = ['modalidad formativa', 'modalidades formativas', 'facilidades horarias', 'flexibilidad horaria', 'adaptar la jornada', 'practicas preprofesionales', 'practicas profesionales', 'jornada formativa'];
+    const hasT3_Comp = t3Compounds.filter(kw => normText.includes(kw)).length >= 1; // Solo 1 porque son muy precisos
     const hasT3 = hasT3_Law || hasT3_Comp;
 
     const c1Checks = [hasT1, hasT2, hasT3];
     const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
     // 2. C2: CASOS REALES Y EVIDENCIA 
-    // Para que el caso sea válido, TIENE que haber desbloqueado el tema (Efecto Dominó)
-    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'equidad pe'];
+    const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'denuncia', 'sentencia', 'sindicato', 'equidad pe', 'mtpe', 'ministerio de trabajo'];
     const hasCaseContext = caseKw.some(kw => normText.includes(kw));
 
     const hasC1_Case = hasT1 && hasCaseContext;
@@ -128,7 +129,7 @@ function evaluateContent(fileName, text) {
 
     // 3. C3: ÉTICA Y ROL RR.HH. (8 pts)
     const p1Kw = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'valor inherente', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
-    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa', 'productividad'];
+    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa', 'proteccion de los activos'];
     const p3Kw = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'solo se debe cumplir', 'situacion aislada'];
 
     const p1Hits = p1Kw.filter(kw => normText.includes(kw)).length;
@@ -159,21 +160,21 @@ function evaluateContent(fileName, text) {
     // 4. RADARES ADICIONALES
     let fortalezasExtra = [];
     
-    // APA (Busca un año entre paréntesis cercano a términos de referencias)
-    const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario)/i.test(normText);
+    // APA Estricto (Año + Fuente)
+    const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
     if (!hasAPA) fortalezasExtra.push('Formato APA en bibliografía');
 
-    // Conectores (Min 3 para redacción fluida)
+    // Conectores
     const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
     if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos (causa/efecto)');
 
-    // Anti-Subtítulos forzados
+    // Anti-Subtítulos
     const subtitulosProhibidos = ['tema 1', 'parte 1', 'parte 2', 'reflexion final', 'tema 2', 'tema 3'];
     if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa sin subtítulos');
 
     // 5. CONSTRUCCIÓN DEL DIAGNÓSTICO
     const ausentaArr = [];
-    if (!hasT1) ausentaArr.push('T1 (Beneficios)');
+    if (!hasT1) ausentaArr.push('T1 (Beneficios/SST)');
     if (!hasT2) ausentaArr.push('T2 (Acoso)');
     if (!hasT3) ausentaArr.push('T3 (Flexibilidad)');
     if (!hasC1_Case && hasT1) ausentaArr.push('Caso T1');
