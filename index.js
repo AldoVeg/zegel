@@ -1,7 +1,6 @@
 /* ============================================================
    index.js — Motor de Evaluación Heurístico Determinista
-   Arquitectura: 6 pts (Normativa) + 6 pts (Evidencia) + 8 pts (Ética)
-   Implementa 4 Radares Extra: Conectores, APA, Anti-Subtítulos.
+   Arquitectura 6-6-8. Prevención de bloqueos (Anti-Crash).
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -126,38 +125,32 @@ function evaluateContent(fileName, text) {
     let c3Checks = [false, false, false];
 
     if (p3Hits > 0) {
-        c3Puntos = 0; // Postura Deficiente (Normaliza el abuso)
+        c3Puntos = 0; 
         stanceMsg = 'Postura Justificadora (normaliza malas prácticas)';
         c3Checks = [true, false, false];
     } else if (p1Hits > 0) {
-        c3Puntos = 8; // Postura Ética (Humana)
+        c3Puntos = 8; 
         stanceMsg = 'Postura Ética Humana (excelente visión integradora)';
         c3Checks = [true, true, true];
     } else if (p2Hits > 0) {
-        c3Puntos = 4; // Postura Legalista (Protege la empresa)
-        stanceMsg = 'Postura Legalista-Corporativa (se enfoca solo en evitar contingencias y multas)';
+        c3Puntos = 4; 
+        stanceMsg = 'Postura Legalista-Corporativa (se enfoca solo en evitar multas)';
         c3Checks = [true, true, false];
     } else {
         c3Puntos = 0;
         stanceMsg = 'No se evidencia reflexión crítica estructurada';
     }
 
-    // 4. RADARES ADICIONALES (El Filtro de Oro)
+    // 4. RADARES ADICIONALES
     let fortalezasExtra = [];
-
-    // Radar 1: Formato APA (Busca un año (YYYY) cerca de una fuente)
     const hasAPA = /\(\d{4}\).{0,60}?(recuperado|http|www|ley|resolucion)/i.test(text);
     if (!hasAPA) fortalezasExtra.push('Formato APA en bibliografía');
 
-    // Radar 2: Conectores Lógicos
     const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
-    const numConectores = conectores.filter(c => normText.includes(c)).length;
-    if (numConectores < 3) fortalezasExtra.push('Uso de conectores lógicos de causa/efecto');
+    if (conectores.filter(c => normText.includes(c)).length < 3) fortalezasExtra.push('Uso de conectores lógicos de causa/efecto');
 
-    // Radar 3: Anti-Copiar/Pegar (Subtítulos de la rúbrica)
-    const subtitulosProhibidos = ['tema 1:', 'parte 1', 'parte 2', 'reflexion final (', 'tema 2:', 'tema 3:'];
-    const tieneSubtitulos = subtitulosProhibidos.some(sub => normText.includes(sub));
-    if (tieneSubtitulos) fortalezasExtra.push('Redacción narrativa fluida (eliminar subtítulos forzados)');
+    const subtitulosProhibidos = ['tema 1:', 'parte 1', 'parte 2', 'reflexion final', 'tema 2:', 'tema 3:'];
+    if (subtitulosProhibidos.some(sub => normText.includes(sub))) fortalezasExtra.push('Redacción narrativa (eliminar subtítulos forzados)');
 
     // 5. CONSTRUCCIÓN DEL DIAGNÓSTICO
     const ausentaArr = [];
@@ -169,13 +162,9 @@ function evaluateContent(fileName, text) {
     if (!hasC3_Case && hasT3) ausentaArr.push('Caso T3');
 
     let diagnostico = `Ausenta: ${ausentaArr.length > 0 ? ausentaArr.join(', ') : 'Ningún requerimiento principal'}. | `;
-    
     diagnostico += `Por fortalecer: ${stanceMsg}`;
-    if (fortalezasExtra.length > 0) {
-        diagnostico += `, ${fortalezasExtra.join(', ')}.`;
-    } else {
-        diagnostico += `.`;
-    }
+    if (fortalezasExtra.length > 0) diagnostico += `, ${fortalezasExtra.join(', ')}.`;
+    else diagnostico += `.`;
 
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
 
@@ -186,7 +175,7 @@ function evaluateContent(fileName, text) {
         c3: c3Puntos, c3Checks: c3Checks,
         notaFinal: notaFinal,
         wordCount: wordCount,
-        bibliografia: { ok: hasAPA }, // Ahora el check verde requiere APA
+        bibliografia: { ok: hasAPA },
         observacion: diagnostico
     };
 }
@@ -278,9 +267,14 @@ async function processAllFiles() {
                 addError(item.name, 'Error al procesar: ' + err.message);
             }
 
+            // Breve pausa para no congelar el navegador
             await new Promise(r => setTimeout(r, 10));
         }
+    } catch (criticalErr) {
+        console.error("Error crítico en el loop: ", criticalErr);
+        addError("Sistema", "Se detuvo el proceso por un error inesperado.");
     } finally {
+        // SEGURIDAD: Siempre desbloquear el sistema
         isProcessing = false;
         if (DOM['loading-overlay']) DOM['loading-overlay'].classList.add('hidden');
 
@@ -369,6 +363,7 @@ function renderTable(filterText = '') {
 function addFilesToList(files) {
     const validTypes = ['pdf', 'docx', 'zip'];
     let addedAny = false;
+    
     for (let i = 0; i < files.length; i++) {
         const type = detectFileType(files[i]);
         if (validTypes.includes(type) && !archivosDetectados.some(f => f.name === files[i].name && f.size === files[i].size)) {
@@ -376,9 +371,10 @@ function addFilesToList(files) {
             addedAny = true;
         }
     }
+    
     if (addedAny) {
         updateFileListUI();
-        processAllFiles(); 
+        processAllFiles(); // Disparo automático
     }
 }
 
@@ -469,14 +465,35 @@ document.addEventListener('DOMContentLoaded', () => {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); }));
         ['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, () => drop.classList.add('dragover')));
         ['dragleave', 'drop'].forEach(e => drop.addEventListener(e, () => drop.classList.remove('dragover')));
-        drop.addEventListener('drop', ev => { if (ev.dataTransfer.files.length) addFilesToList(ev.dataTransfer.files); });
+        drop.addEventListener('drop', ev => { 
+            if (ev.dataTransfer.files.length) addFilesToList(ev.dataTransfer.files); 
+        });
     }
 
-    DOM['file-input']?.addEventListener('change', function() { if (this.files.length) addFilesToList(this.files); });
-    DOM['folder-input']?.addEventListener('change', function() { if (this.files.length) addFilesToList(this.files); });
+    DOM['file-input']?.addEventListener('change', function(ev) { 
+        if (this.files.length) {
+            addFilesToList(this.files); 
+            ev.target.value = ''; // FIX: Limpia el input para permitir subir el mismo archivo de nuevo
+        }
+    });
+    
+    DOM['folder-input']?.addEventListener('change', function(ev) { 
+        if (this.files.length) {
+            addFilesToList(this.files);
+            ev.target.value = ''; // FIX: Limpia el input
+        }
+    });
+
     DOM['btn-folder']?.addEventListener('click', () => DOM['folder-input'].click());
     DOM['btn-clear']?.addEventListener('click', clearAll);
-    DOM['btn-cancel']?.addEventListener('click', () => abortController?.abort());
+    
+    // FIX: Botón de cancelar fuerza el desbloqueo del sistema
+    DOM['btn-cancel']?.addEventListener('click', () => {
+        if (abortController) abortController.abort();
+        isProcessing = false; 
+        DOM['loading-overlay'].classList.add('hidden');
+    });
+
     DOM['btn-export-csv']?.addEventListener('click', exportCSV);
     DOM['btn-export-pdf']?.addEventListener('click', exportPDF);
     DOM['filter-input']?.addEventListener('input', function() { renderTable(this.value); });
