@@ -334,3 +334,277 @@ function renderPill(label, isOk) {
     if (!isOk) return '';
     return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
 }
+
+function renderScoreBadge(score, max) {
+    let color = '#ef4444', bg = '#fef2f2';
+    const pct = score / max;
+    if (pct >= 0.7) { color = '#10b981'; bg = '#ecfdf5'; }
+    else if (pct >= 0.4) { color = '#f59e0b'; bg = '#fffbeb'; }
+
+    return '<div style="display:inline-block; text-align:center; padding:2px 6px; border-radius:6px; background:' + bg + '; color:' + color + '; border:1px solid ' + color + '33;"><span style="font-size:0.85rem; font-weight:800;">' + score + '</span><span style="font-size:0.65rem; opacity:0.8;">/' + max + '</span></div>';
+}
+
+function renderFinalBadge(nota) {
+    let bg = '#10b981';
+    if (nota < 11) bg = '#ef4444';
+    else if (nota < 14) bg = '#f59e0b';
+    return '<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:' + bg + ';">' + nota + ' / 20</span>';
+}
+
+function renderTable(filterText) {
+    if (filterText === undefined) filterText = '';
+    const tbody = DOM['table-body'];
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    let filtered = resultadosEvaluacion.filter(function(r) { 
+        return r.estudiante.toLowerCase().includes(filterText.toLowerCase()); 
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#6b7280;">Sin datos de evaluación.</td></tr>';
+        if (DOM['results-count']) DOM['results-count'].classList.add('hidden');
+        return;
+    }
+
+    if (DOM['results-count']) {
+        DOM['results-count'].classList.remove('hidden');
+        DOM['results-count'].textContent = 'Mostrando ' + filtered.length + ' de ' + resultadosEvaluacion.length;
+    }
+
+    filtered.forEach(function(r, idx) {
+        const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ APA OK</span>' : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
+
+        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
+        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
+        
+        let c3Pills = '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
+        if (r.c3 === 8) c3Pills = renderPill('Óptimo (8p)', true);
+        else if (r.c3 === 6) c3Pills = renderPill('Bueno (6p)', true);
+        else if (r.c3 === 4) c3Pills = renderPill('Parcial/Legal (4p)', true);
+        else if (r.c3Checks[0]) c3Pills = renderPill('Deficiente (0p)', true);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td style="text-align:center; font-weight:600; color:#6b7280; font-size:0.85rem;">' + (idx + 1) + '</td>' +
+            '<td style="font-weight:600; color:#111827; font-size:0.85rem;">' + escapeHTML(r.estudiante) + '</td>' +
+            '<td style="text-align:center;">' + renderScoreBadge(r.c1, 6) + '<br><div style="margin-top:3px;">' + c1Pills + '</div></td>' +
+            '<td style="text-align:center;">' + renderScoreBadge(r.c2, 6) + '<br><div style="margin-top:3px;">' + c2Pills + '</div></td>' +
+            '<td style="text-align:center;">' + renderScoreBadge(r.c3, 8) + '<br><div style="margin-top:3px;">' + c3Pills + '</div></td>' +
+            '<td style="text-align:center;">' + renderFinalBadge(r.notaFinal) + '</td>' +
+            '<td style="text-align:center; font-size:0.8rem; color:#4b5563;">' + r.wordCount + ' pal.</td>' +
+            '<td style="text-align:center;">' + bibIcon + '</td>' +
+            '<td style="font-size:0.8rem; color:#374151; line-height:1.35; padding: 8px;"><div style="background:#f9fafb; border-left:3px solid #6366f1; padding:6px 8px; border-radius:0 4px 4px 0;">' + escapeHTML(r.observacion) + '</div></td>';
+        tbody.appendChild(tr);
+    });
+}
+
+function addFilesToList(files) {
+    if (!files || files.length === 0) return;
+    const validTypes = ['pdf', 'docx', 'zip'];
+    let addedAny = false;
+    
+    for (let i = 0; i < files.length; i++) {
+        const type = detectFileType(files[i]);
+        if (validTypes.includes(type)) {
+            const exists = archivosDetectados.some(function(f) { 
+                return f.name === files[i].name && f.size === files[i].size; 
+            });
+            if (!exists) {
+                archivosDetectados.push({ name: files[i].name, type: type, file: files[i], size: files[i].size });
+                addedAny = true;
+            }
+        }
+    }
+    
+    if (addedAny) {
+        updateFileListUI();
+        processAllFiles(); 
+    }
+}
+
+function updateFileListUI() {
+    if (!DOM['file-list-items']) return;
+    DOM['file-list-items'].innerHTML = '';
+    if (archivosDetectados.length === 0) {
+        if (DOM['file-list']) DOM['file-list'].classList.add('hidden');
+        return;
+    }
+    if (DOM['file-list']) DOM['file-list'].classList.remove('hidden');
+    if (DOM['file-count']) DOM['file-count'].textContent = archivosDetectados.length;
+
+    archivosDetectados.forEach(function(f, i) {
+        const chip = document.createElement('li');
+        chip.className = 'file-chip';
+        chip.style.cssText = 'display:inline-flex; align-items:center; gap:6px; background:#f3f4f6; padding:4px 8px; border-radius:6px; margin:2px; font-size:0.8rem;';
+        chip.innerHTML = getFileTypeIcon(f.type) + ' <span>' + escapeHTML(f.name.length > 25 ? f.name.slice(0, 22) + '...' : f.name) + '</span> <button class="chip-remove" data-index="' + i + '" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer;">&times;</button>';
+        DOM['file-list-items'].appendChild(chip);
+    });
+
+    DOM['file-list-items'].querySelectorAll('.chip-remove').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.index);
+            archivosDetectados.splice(idx, 1);
+            updateFileListUI();
+            if (archivosDetectados.length > 0) processAllFiles();
+            else clearAll();
+        });
+    });
+}
+
+function addError(archivo, mensaje) {
+    if (!DOM['error-panel'] || !DOM['error-list']) return;
+    DOM['error-panel'].classList.remove('hidden');
+    const li = document.createElement('li');
+    li.style.cssText = 'color:#dc2626; margin-bottom:4px; font-size:0.85rem;';
+    li.textContent = '[' + archivo + '] ' + mensaje;
+    DOM['error-list'].appendChild(li);
+}
+
+function clearAll() {
+    if (abortController) abortController.abort();
+    isProcessing = false;
+    resultadosEvaluacion = [];
+    archivosDetectados = [];
+    if (DOM['table-body']) DOM['table-body'].innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#6b7280;">Sube o arrastra archivos para iniciar la evaluación automática.</td></tr>';
+    if (DOM['file-list']) DOM['file-list'].classList.add('hidden');
+    if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
+    if (DOM['error-list']) DOM['error-list'].innerHTML = '';
+    if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = true;
+    if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = true;
+    if (DOM['file-input']) DOM['file-input'].value = '';
+    if (DOM['folder-input']) DOM['folder-input'].value = '';
+}
+
+function exportCSV() {
+    if (resultadosEvaluacion.length === 0) return;
+    let csv = 'Estudiante,C1(6),C2(6),C3(8),Nota Final,Palabras,Bibliografia,Diagnostico Sintetico\n';
+    resultadosEvaluacion.forEach(function(r) {
+        csv += '"' + r.estudiante + '",' + r.c1 + ',' + r.c2 + ',' + r.c3 + ',' + r.notaFinal + ',' + r.wordCount + ',"' + (r.bibliografia.ok ? 'APA OK' : 'NO') + '","' + r.observacion.replace(/"/g, '""') + '"\n';
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }));
+    link.download = 'Evaluaciones_' + new Date().toISOString().slice(0,10) + '.csv';
+    link.click();
+}
+
+function exportPDF() {
+    if (resultadosEvaluacion.length === 0 || !window.jspdf) return;
+    const doc = new window.jspdf.jsPDF('l', 'mm', 'a4');
+    doc.setFontSize(14);
+    doc.text("Reporte de Evaluaciones Académicas", 14, 15);
+    let y = 25;
+    doc.setFontSize(9);
+    doc.text("#", 14, y);
+    doc.text("Estudiante", 25, y);
+    doc.text("C1", 85, y);
+    doc.text("C2", 100, y);
+    doc.text("C3", 115, y);
+    doc.text("Nota", 130, y);
+    doc.text("Diagnóstico Concreto", 145, y);
+    doc.line(14, y + 2, 280, y + 2);
+    y += 8;
+    resultadosEvaluacion.forEach(function(r, idx) {
+        if (y > 180) { doc.addPage(); y = 20; }
+        doc.text(String(idx + 1), 14, y);
+        doc.text(String(r.estudiante).substring(0, 25), 25, y);
+        doc.text(String(r.c1), 85, y);
+        doc.text(String(r.c2), 100, y);
+        doc.text(String(r.c3), 115, y);
+        doc.text(String(r.notaFinal), 130, y);
+        doc.text(String(r.observacion).substring(0, 75), 145, y);
+        y += 7;
+    });
+    doc.save('Evaluaciones_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+// ─── INICIALIZACIÓN Y EVENT LISTENERS ───
+document.addEventListener('DOMContentLoaded', function() {
+    cacheDOM();
+
+    if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const drop = DOM['drop-zone'];
+    if (drop) {
+        // Permitir abrir explorador con clic en drop-zone
+        drop.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                if (DOM['file-input']) DOM['file-input'].click();
+            }
+        });
+
+        // Eventos Drag and Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(e) {
+            drop.addEventListener(e, function(ev) { 
+                ev.preventDefault(); 
+                ev.stopPropagation(); 
+            });
+        });
+
+        ['dragenter', 'dragover'].forEach(function(e) {
+            drop.addEventListener(e, function() { drop.classList.add('dragover'); });
+        });
+
+        ['dragleave', 'drop'].forEach(function(e) {
+            drop.addEventListener(e, function() { drop.classList.remove('dragover'); });
+        });
+
+        drop.addEventListener('drop', function(ev) {
+            if (ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length > 0) {
+                addFilesToList(ev.dataTransfer.files);
+            }
+        });
+    }
+
+    if (DOM['file-input']) {
+        DOM['file-input'].addEventListener('change', function(ev) {
+            if (this.files && this.files.length > 0) {
+                addFilesToList(this.files);
+                this.value = '';
+            }
+        });
+    }
+
+    if (DOM['folder-input']) {
+        DOM['folder-input'].addEventListener('change', function(ev) {
+            if (this.files && this.files.length > 0) {
+                addFilesToList(this.files);
+                this.value = '';
+            }
+        });
+    }
+
+    if (DOM['btn-folder']) {
+        DOM['btn-folder'].addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (DOM['folder-input']) DOM['folder-input'].click();
+        });
+    }
+
+    if (DOM['btn-clear']) DOM['btn-clear'].addEventListener('click', clearAll);
+
+    if (DOM['btn-cancel']) {
+        DOM['btn-cancel'].addEventListener('click', function() {
+            if (abortController) abortController.abort();
+            isProcessing = false;
+            if (DOM['loading-overlay']) DOM['loading-overlay'].classList.add('hidden');
+        });
+    }
+
+    if (DOM['btn-export-csv']) DOM['btn-export-csv'].addEventListener('click', exportCSV);
+    if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].addEventListener('click', exportPDF);
+
+    if (DOM['filter-input']) {
+        DOM['filter-input'].addEventListener('input', function() {
+            renderTable(this.value);
+        });
+    }
+
+    if (DOM['btn-dismiss-errors']) {
+        DOM['btn-dismiss-errors'].addEventListener('click', function() {
+            if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
+        });
+    }
+});
