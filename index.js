@@ -1,115 +1,30 @@
-/* ============================================================
-   index.js — Motor de Evaluación Heurístico Determinista v9.0
-   Análisis Narrativo Continuo e Integrado (C1, C2 y C3)
-   ============================================================ */
-
-let resultadosEvaluacion = [];
-let archivosDetectados = [];
-let abortController = null;
-let isProcessing = false;
-
-const DOM = {};
-
-function cacheDOM() {
-    const ids = [
-        'drop-zone', 'file-input', 'folder-input', 'btn-folder', 'file-list', 
-        'file-list-items', 'file-count', 'btn-clear', 'btn-export-pdf', 
-        'btn-export-csv', 'error-panel', 'error-list', 'btn-dismiss-errors', 
-        'table-body', 'filter-input', 'results-count', 'loading-overlay', 
-        'loading-title', 'loading-detail', 'overlay-progress', 'overlay-percent', 
-        'btn-cancel'
-    ];
-    ids.forEach(function(id) { 
-        DOM[id] = document.getElementById(id); 
-    });
-}
-
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>'"]/g, function(tag) {
-        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
-        return map[tag] || tag;
-    });
-}
-
-function normalizeText(text) {
-    if (!text) return '';
-    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, ' ');
-}
-
-function detectFileType(file) {
-    if (!file || !file.name) return 'other';
-    const name = file.name.toLowerCase();
-    if (name.endsWith('.pdf')) return 'pdf';
-    if (name.endsWith('.docx')) return 'docx';
-    if (name.endsWith('.zip')) return 'zip';
-    return 'other';
-}
-
-function getFileTypeIcon(type) {
-    if (type === 'pdf') return '📄';
-    if (type === 'docx') return '📝';
-    if (type === 'zip') return '📦';
-    return '📎';
-}
-
-function extractStudentIdentity(fileName, text) {
-    if (!text) return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
-    const cleanText = text.trim();
-    const patrones = [
-        /(?:estudiante|alumno|autor|presentado\s*por|elaborado\s*por|nombre)\s*:\s*([^\n]{3,60})/i,
-        /(?:estudiante|alumno|autor|presentado\s*por|elaborado\s*por|nombre)\s*[:\-]\s*([^\n]{3,60})/i
-    ];
-    for (let i = 0; i < patrones.length; i++) {
-        const match = cleanText.match(patrones[i]);
-        if (match && match[1] && match[1].trim().length > 2) {
-            return match[1].trim().replace(/\s+/g, ' ');
-        }
-    }
-    const lines = cleanText.split(/\r?\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
-    for (let j = 0; j < Math.min(lines.length, 5); j++) {
-        const line = lines[j];
-        if (/^[A-ZÁÉÍÓÚÑa-záéíóúñ\s,]{6,60}$/.test(line) && line.split(/\s+/).length >= 2 && !line.toLowerCase().includes('tema')) {
-            return line.trim();
-        }
-    }
-    return fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_\-]/g, ' ');
-}
-
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE NAVEGACIÓN Y ANÁLISIS DE CONTEXTO NARRATIVO
+// 1. DICCIONARIOS EXHAUSTIVOS (FILTROS DE RECONOCIMIENTO)
 // ═══════════════════════════════════════════════════════════
 
-// Diccionarios contextuales por Temas
-const VOCABULARIO_TEMATICO = {
+const DICCIONARIO = {
     T1: {
-        normas: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'ds 005 2012 tr', 'ley 25129', 'ley 26790', 'ley 30056'],
-        conceptos: ['seguridad y salud en el trabajo', 'cts', 'compensacion por tiempo', 'gratificaciones', 'asignacion familiar', 'participacion de utilidades', 'descanso vacacional', 'horas extras', 'prevencion de riesgos', 'seguro de vida ley']
+        normas: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'ds 005 2012', 'ley 25129', 'ley 26790', 'ley 30056'],
+        conceptos: ['seguridad y salud', 'cts', 'compensacion por tiempo', 'gratificacion', 'asignacion familiar', 'utilidades', 'descanso vacacional', 'horas extras', 'riesgos laborales', 'seguro de vida ley']
     },
     T2: {
-        normas: ['ley 27942', 'convenio 190', 'ds 014 2019 mimp', 'ley 31156', 'dl 1410'],
-        conceptos: ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada']
+        normas: ['ley 27942', 'convenio 190', 'ds 014 2019', 'ley 31156', 'dl 1410'],
+        conceptos: ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'comite frente al hostigamiento']
     },
     T3: {
-        normas: ['ley 28518', 'ds 011 2012 tr', 'ley 31396'],
-        conceptos: ['modalidad formativa', 'modalidades formativas', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'subvencion economica', 'facilidades horarias']
+        normas: ['ley 28518', 'ds 011 2012', 'ley 31396'],
+        conceptos: ['modalidad formativa', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'subvencion economica', 'facilidades horarias', 'practicante']
+    },
+    NARRATIVA_CASO: {
+        actores: ['trabajador', 'trabajadora', 'empleador', 'empresa', 'colaborador', 'demandante', 'gerente', 'jefe', 'practicante', 'victima', 'inspector', 'sindicato', 'recursos humanos', 'rrhh'],
+        conflictos: ['despidio', 'incumplio', 'vulnero', 'demando', 'sanciono', 'sufrio', 'acoso', 'accidento', 'omitio', 'reclamo', 'denuncio', 'multo', 'afecto', 'obligo', 'coacciono', 'no pago', 'accidente de trabajo'],
+        contextoLegal: ['sunafil', 'el peruano', 'tribunal constitucional', 'corte suprema', 'expediente', 'casacion', 'resolucion', 'sentencia', 'multa', 'inspeccion', 'demanda laboral', 'conciliacion']
     }
 };
 
-const INDICADORES_CASO = {
-    actores: ['trabajador', 'empleador', 'empresa', 'colaborador', 'demandante', 'gerente', 'jefe', 'practicante', 'victima', 'inspector', 'sindicato'],
-    acciones: ['despidio', 'incumplio', 'vulnero', 'demando', 'sanciono', 'sufrio', 'acoso', 'accidento', 'omitio', 'reclamo', 'sancionaron', 'denuncio', 'multo'],
-    fuentes: ['sunafil', 'el peruano', 'tribunal constitucional', 'corte suprema', 'expediente', 'casacion', 'resolucion', 'sentencia', 'multa', 'denuncia ante', 'inspeccion']
-};
-
-function splitInNarrativeBlocks(text) {
-    const normText = normalizeText(text);
-    let parrafos = text.split(/(?:\r?\n){2,}/).map(function(p) { return normalizeText(p); }).filter(function(p) { return p.length > 80; });
-    if (parrafos.length === 0) {
-        parrafos = normText.match(/.{1,350}(?:\s|$)/g) || [normText];
-    }
-    return parrafos;
-}
+// ═══════════════════════════════════════════════════════════
+// 2. MOTOR DE EVALUACIÓN MINUCIOSO (Reemplazar evaluateContent)
+// ═══════════════════════════════════════════════════════════
 
 function evaluateContent(fileName, text) {
     const wordCount = text ? text.trim().split(/\s+/).filter(function(w) { return w.match(/[a-z0-9]/i); }).length : 0;
@@ -123,57 +38,66 @@ function evaluateContent(fileName, text) {
             c2: 0, c2Checks: [false, false, false],
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Ausenta: Contenido mínimo. Documento en blanco o insuficiente.'
+            observacion: 'Ausenta: Contenido mínimo. Documento insuficiente o vacío.'
         };
     }
 
-    const bloques = splitInNarrativeBlocks(text);
+    // Dividimos en bloques (párrafos) para evaluar el contexto de cerca
+    const bloques = text.split(/(?:\r?\n){2,}|\.\s+/).map(function(p) { return normalizeText(p); }).filter(function(p) { return p.length > 30; });
 
-    // ─── CRITERIO 1: ANÁLISIS NORMATIVO Y CONCEPTUAL (C1) ───
-    function checkNormativePresence(topicKey) {
-        const topic = VOCABULARIO_TEMATICO[topicKey];
-        const tieneNormaDirecta = topic.normas.some(function(n) { return normText.includes(n); });
-        const coincidenciaConceptos = topic.conceptos.filter(function(c) { return normText.includes(c); }).length;
-        return tieneNormaDirecta || coincidenciaConceptos >= 2;
-    }
+    // Variables para medir la DENSIDAD de cada tema (soluciona el "desarrollo insuficiente" de C1)
+    let palabrasT1 = 0, palabrasT2 = 0, palabrasT3 = 0;
+    let hasT1_Case = false, hasT2_Case = false, hasT3_Case = false;
 
-    const hasT1_Norm = checkNormativePresence('T1');
-    const hasT2_Norm = checkNormativePresence('T2');
-    const hasT3_Norm = checkNormativePresence('T3');
+    // Evaluamos bloque a bloque
+    bloques.forEach(function(bloque) {
+        const palabrasEnBloque = bloque.split(/\s+/).length;
+
+        // Detectar presencia de temas en el bloque
+        const esT1 = DICCIONARIO.T1.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T1.conceptos.some(kw => bloque.includes(kw));
+        const esT2 = DICCIONARIO.T2.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T2.conceptos.some(kw => bloque.includes(kw));
+        const esT3 = DICCIONARIO.T3.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T3.conceptos.some(kw => bloque.includes(kw));
+
+        // Acumular palabras si el tema se está desarrollando (Para C1)
+        if (esT1) palabrasT1 += palabrasEnBloque;
+        if (esT2) palabrasT2 += palabrasEnBloque;
+        if (esT3) palabrasT3 += palabrasEnBloque;
+
+        // Evaluación estricta de Casos Narrativos (Para C2)
+        const tieneActor = DICCIONARIO.NARRATIVA_CASO.actores.some(kw => bloque.includes(kw));
+        const tieneConflicto = DICCIONARIO.NARRATIVA_CASO.conflictos.some(kw => bloque.includes(kw));
+        const tieneContextoLegal = DICCIONARIO.NARRATIVA_CASO.contextoLegal.some(kw => bloque.includes(kw));
+
+        // Un caso real requiere: (Actor + Conflicto) O (Mención a expediente/Sunafil/Resolución)
+        if ((tieneActor && tieneConflicto) || tieneContextoLegal) {
+            if (esT1) hasT1_Case = true;
+            if (esT2) hasT2_Case = true;
+            if (esT3) hasT3_Case = true;
+        }
+    });
+
+    // ─── CRITERIO 1: Análisis Normativo (Exige mínimo 40 palabras por tema para ser válido) ───
+    // Esto atrapa el caso de "Andrea" donde T3 es muy cortito (insuficiente).
+    const UMBRAL_PALABRAS = 40; 
+    const hasT1_Norm = palabrasT1 >= UMBRAL_PALABRAS;
+    const hasT2_Norm = palabrasT2 >= UMBRAL_PALABRAS;
+    const hasT3_Norm = palabrasT3 >= UMBRAL_PALABRAS;
 
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
-    const c1Puntos = c1Checks.filter(Boolean).length * 2;
+    const c1Puntos = c1Checks.filter(Boolean).length * 2; // 2 puntos por tema bien desarrollado
 
-    // ─── CRITERIO 2: DESARROLLO DE CASOS REALES / PRÁCTICOS (C2) ───
-    function checkCaseNarrative(bloque, topicKey) {
-        const topic = VOCABULARIO_TEMATICO[topicKey];
-        const tieneTema = topic.normas.some(function(n) { return bloque.includes(n); }) || 
-                          topic.conceptos.some(function(c) { return bloque.includes(c); });
-        
-        if (!tieneTema) return false;
-
-        const tieneFuente = INDICADORES_CASO.fuentes.some(function(f) { return bloque.includes(f); });
-        const tieneActor = INDICADORES_CASO.actores.some(function(a) { return bloque.includes(a); });
-        const tieneAccion = INDICADORES_CASO.acciones.some(function(ac) { return bloque.includes(ac); });
-
-        return tieneFuente || (tieneActor && tieneAccion);
-    }
-
-    const hasT1_Case = bloques.some(function(b) { return checkCaseNarrative(b, 'T1'); });
-    const hasT2_Case = bloques.some(function(b) { return checkCaseNarrative(b, 'T2'); });
-    const hasT3_Case = bloques.some(function(b) { return checkCaseNarrative(b, 'T3'); });
-
+    // ─── CRITERIO 2: Desarrollo de Casos ───
     const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
-    const c2Puntos = c2Checks.filter(Boolean).length * 2;
+    const c2Puntos = c2Checks.filter(Boolean).length * 2; // 2 puntos por caso detectado
 
-    // ─── CRITERIO 3: REFLEXIÓN ÉTICA Y POSTURA CRÍTICA (C3) ───
-    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
-    const kwLegalista = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa'];
-    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'situacion aislada'];
+    // ─── CRITERIO 3: Reflexión Ética ───
+    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto'];
+    const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion'];
+    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'no es obligatorio', 'trabajador debe adaptarse'];
 
-    const hitHumanista = kwHumanista.filter(function(k) { return normText.includes(k); }).length;
-    const hitLegalista = kwLegalista.filter(function(k) { return normText.includes(k); }).length;
-    const hitDeficiente = kwDeficiente.filter(function(k) { return normText.includes(k); }).length;
+    const hitHumanista = kwHumanista.filter(k => normText.includes(k)).length;
+    const hitLegalista = kwLegalista.filter(k => normText.includes(k)).length;
+    const hitDeficiente = kwDeficiente.filter(k => normText.includes(k)).length;
 
     let c3Puntos = 0;
     let stanceMsg = '';
@@ -181,44 +105,45 @@ function evaluateContent(fileName, text) {
 
     if (hitDeficiente > 0) {
         c3Puntos = 0;
-        stanceMsg = 'Postura Deficiente (normaliza o justifica malas prácticas)';
+        stanceMsg = 'Ética Deficiente (justifica malas prácticas)';
         c3Checks = [true, false, false];
     } else if (hitHumanista >= 2) {
         if (c1Puntos === 6 && c2Puntos === 6) {
             c3Puntos = 8;
-            stanceMsg = 'Postura Ética Humana Impecable (Análisis y casos completos al 100%)';
+            stanceMsg = 'Ética Impecable (Desarrollo completo)';
             c3Checks = [true, true, true];
         } else if (c1Puntos >= 4 && c2Puntos >= 4) {
             c3Puntos = 6;
-            stanceMsg = 'Postura Ética Humana Buena (Con pequeñas omisiones temáticas)';
+            stanceMsg = 'Ética Buena (Presenta omisiones temáticas)';
             c3Checks = [true, true, false];
         } else {
             c3Puntos = 4;
-            stanceMsg = 'Postura Ética Humana Parcial (Desbalance en cobertura de casos o normas)';
+            stanceMsg = 'Ética Parcial (Vacíos graves en normas o casos)';
             c3Checks = [true, false, false];
         }
     } else if (hitLegalista >= 2) {
         c3Puntos = 4;
-        stanceMsg = 'Postura Legalista (Enfocada en evitar multas y contingencias)';
+        stanceMsg = 'Ética Legalista (Enfocada en evitar multas)';
         c3Checks = [true, false, false];
     } else {
         c3Puntos = 0;
-        stanceMsg = 'Sin reflexión crítica ni postura personal evidenciada';
+        stanceMsg = 'Sin reflexión crítica clara';
     }
 
-    // ─── FORMATO Y DIAGNÓSTICO SINTÉTICO ───
+    // ─── DIAGNÓSTICO SINTÉTICO ───
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
     
     const ausencias = [];
-    if (!hasT1_Norm) ausencias.push('Norma T1 (SST/Derechos)');
-    if (!hasT2_Norm) ausencias.push('Norma T2 (Hostigamiento)');
-    if (!hasT3_Norm) ausencias.push('Norma T3 (Modalidades Formativas)');
-    if (!hasT1_Case) ausencias.push('Caso Real T1');
-    if (!hasT2_Case) ausencias.push('Caso Real T2');
-    if (!hasT3_Case) ausencias.push('Caso Real T3');
+    if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 (Insuficiente)' : 'T1 (Ausente)');
+    if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 (Insuficiente)' : 'T2 (Ausente)');
+    if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3 (Insuficiente)' : 'T3 (Ausente)');
+    
+    if (!hasT1_Case && hasT1_Norm) ausencias.push('Caso T1');
+    if (!hasT2_Case && hasT2_Norm) ausencias.push('Caso T2');
+    if (!hasT3_Case && hasT3_Norm) ausencias.push('Caso T3');
 
-    let diagnostico = 'Ausenta: ' + (ausencias.length > 0 ? ausencias.join(', ') : 'Ninguna omisión tematica') + '. | ';
-    diagnostico += 'Ética: ' + stanceMsg + '.';
+    let diagnostico = 'Observaciones: ' + (ausencias.length > 0 ? ausencias.join(', ') : 'Ninguna omisión') + '. | ';
+    diagnostico += stanceMsg + '.';
 
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
 
@@ -233,395 +158,3 @@ function evaluateContent(fileName, text) {
         observacion: diagnostico
     };
 }
-
-// ─── EXTRACCIÓN CON PROTECCIÓN CDN ───
-async function extractTextFromPDF(file) {
-    if (typeof pdfjsLib === 'undefined') {
-        throw new Error('PDF.js no está cargado.');
-    }
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map(function(item) { return item.str; }).join(' ') + '\n';
-    }
-    return fullText;
-}
-
-async function extractTextFromDOCX(file) {
-    if (typeof mammoth === 'undefined') {
-        throw new Error('Mammoth.js no está cargado.');
-    }
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
-    return result.value || '';
-}
-
-async function extractFilesFromZip(zipFile) {
-    if (typeof JSZip === 'undefined') {
-        throw new Error('JSZip no está cargado.');
-    }
-    const extracted = [];
-    const zip = await JSZip.loadAsync(zipFile);
-    const entries = Object.values(zip.files).filter(function(entry) { return !entry.dir; });
-
-    for (let k = 0; k < entries.length; k++) {
-        const zipEntry = entries[k];
-        const lower = zipEntry.name.toLowerCase();
-        if (lower.endsWith('.pdf') || lower.endsWith('.docx')) {
-            const blob = await zipEntry.async('blob');
-            const file = new File([blob], zipEntry.name.split('/').pop(), {
-                type: lower.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            });
-            extracted.push({ name: file.name, type: lower.endsWith('.pdf') ? 'pdf' : 'docx', file: file, size: blob.size });
-        }
-    }
-    return extracted;
-}
-
-// ─── PROCESAMIENTO EN LOTE ───
-async function processAllFiles() {
-    if (isProcessing || archivosDetectados.length === 0) return;
-
-    isProcessing = true;
-    abortController = new AbortController();
-
-    if (DOM['table-body']) DOM['table-body'].innerHTML = '';
-    if (DOM['loading-overlay']) DOM['loading-overlay'].classList.remove('hidden');
-
-    try {
-        let cola = archivosDetectados.slice();
-        let total = cola.length;
-        let procesados = 0;
-
-        while (cola.length > 0) {
-            if (abortController.signal.aborted) break;
-
-            let item = cola.shift();
-
-            if (item.type === 'zip') {
-                try {
-                    let extracted = await extractFilesFromZip(item.file);
-                    cola.unshift(...extracted);
-                    total += extracted.length;
-                } catch (e) {
-                    addError(item.name, e.message);
-                }
-                procesados++;
-                continue;
-            }
-
-            procesados++;
-            const pct = Math.round((procesados / total) * 100);
-
-            if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Evaluando (' + procesados + '/' + total + '): ' + item.name;
-            if (DOM['overlay-progress']) DOM['overlay-progress'].value = pct;
-            if (DOM['overlay-percent']) DOM['overlay-percent'].textContent = pct + '%';
-
-            try {
-                let text = '';
-                if (item.type === 'pdf') text = await extractTextFromPDF(item.file);
-                else if (item.type === 'docx') text = await extractTextFromDOCX(item.file);
-
-                const res = evaluateContent(item.name, text);
-                resultadosEvaluacion.push(res);
-
-            } catch (err) {
-                addError(item.name, err.message);
-            }
-            await new Promise(function(r) { setTimeout(r, 10); });
-        }
-    } catch (criticalErr) {
-        addError("Sistema", "Se interrumpió el proceso: " + criticalErr.message);
-    } finally {
-        isProcessing = false;
-        if (DOM['loading-overlay']) DOM['loading-overlay'].classList.add('hidden');
-
-        if (resultadosEvaluacion.length > 0) {
-            if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = false;
-            if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = false;
-            if (DOM['btn-clear']) DOM['btn-clear'].disabled = false;
-            renderTable();
-        }
-    }
-}
-
-// ─── INTERFAZ Y RENDERIZADO ───
-function renderPill(label, isOk) {
-    if (!isOk) return '';
-    return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
-}
-
-function renderScoreBadge(score, max) {
-    let color = '#ef4444', bg = '#fef2f2';
-    const pct = score / max;
-    if (pct >= 0.7) { color = '#10b981'; bg = '#ecfdf5'; }
-    else if (pct >= 0.4) { color = '#f59e0b'; bg = '#fffbeb'; }
-
-    return '<div style="display:inline-block; text-align:center; padding:2px 6px; border-radius:6px; background:' + bg + '; color:' + color + '; border:1px solid ' + color + '33;"><span style="font-size:0.85rem; font-weight:800;">' + score + '</span><span style="font-size:0.65rem; opacity:0.8;">/' + max + '</span></div>';
-}
-
-function renderFinalBadge(nota) {
-    let bg = '#10b981';
-    if (nota < 11) bg = '#ef4444';
-    else if (nota < 14) bg = '#f59e0b';
-    return '<span style="display:inline-block; padding:4px 10px; font-weight:800; font-size:0.85rem; border-radius:20px; color:#ffffff; background:' + bg + ';">' + nota + ' / 20</span>';
-}
-
-function renderTable(filterText) {
-    if (filterText === undefined) filterText = '';
-    const tbody = DOM['table-body'];
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-    let filtered = resultadosEvaluacion.filter(function(r) { 
-        return r.estudiante.toLowerCase().includes(filterText.toLowerCase()); 
-    });
-
-    if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#6b7280;">Sin datos de evaluación.</td></tr>';
-        if (DOM['results-count']) DOM['results-count'].classList.add('hidden');
-        return;
-    }
-
-    if (DOM['results-count']) {
-        DOM['results-count'].classList.remove('hidden');
-        DOM['results-count'].textContent = 'Mostrando ' + filtered.length + ' de ' + resultadosEvaluacion.length;
-    }
-
-    filtered.forEach(function(r, idx) {
-        const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ APA OK</span>' : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
-
-        const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        
-        let c3Pills = '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        if (r.c3 === 8) c3Pills = renderPill('Óptimo (8p)', true);
-        else if (r.c3 === 6) c3Pills = renderPill('Bueno (6p)', true);
-        else if (r.c3 === 4) c3Pills = renderPill('Parcial/Legal (4p)', true);
-        else if (r.c3Checks[0]) c3Pills = renderPill('Deficiente (0p)', true);
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td style="text-align:center; font-weight:600; color:#6b7280; font-size:0.85rem;">' + (idx + 1) + '</td>' +
-            '<td style="font-weight:600; color:#111827; font-size:0.85rem;">' + escapeHTML(r.estudiante) + '</td>' +
-            '<td style="text-align:center;">' + renderScoreBadge(r.c1, 6) + '<br><div style="margin-top:3px;">' + c1Pills + '</div></td>' +
-            '<td style="text-align:center;">' + renderScoreBadge(r.c2, 6) + '<br><div style="margin-top:3px;">' + c2Pills + '</div></td>' +
-            '<td style="text-align:center;">' + renderScoreBadge(r.c3, 8) + '<br><div style="margin-top:3px;">' + c3Pills + '</div></td>' +
-            '<td style="text-align:center;">' + renderFinalBadge(r.notaFinal) + '</td>' +
-            '<td style="text-align:center; font-size:0.8rem; color:#4b5563;">' + r.wordCount + ' pal.</td>' +
-            '<td style="text-align:center;">' + bibIcon + '</td>' +
-            '<td style="font-size:0.8rem; color:#374151; line-height:1.35; padding: 8px;"><div style="background:#f9fafb; border-left:3px solid #6366f1; padding:6px 8px; border-radius:0 4px 4px 0;">' + escapeHTML(r.observacion) + '</div></td>';
-        tbody.appendChild(tr);
-    });
-}
-
-function addFilesToList(files) {
-    if (!files || files.length === 0) return;
-    const validTypes = ['pdf', 'docx', 'zip'];
-    let addedAny = false;
-    
-    for (let i = 0; i < files.length; i++) {
-        const type = detectFileType(files[i]);
-        if (validTypes.includes(type)) {
-            const exists = archivosDetectados.some(function(f) { 
-                return f.name === files[i].name && f.size === files[i].size; 
-            });
-            if (!exists) {
-                archivosDetectados.push({ name: files[i].name, type: type, file: files[i], size: files[i].size });
-                addedAny = true;
-            }
-        }
-    }
-    
-    if (addedAny) {
-        updateFileListUI();
-        processAllFiles(); 
-    }
-}
-
-function updateFileListUI() {
-    if (!DOM['file-list-items']) return;
-    DOM['file-list-items'].innerHTML = '';
-    if (archivosDetectados.length === 0) {
-        if (DOM['file-list']) DOM['file-list'].classList.add('hidden');
-        return;
-    }
-    if (DOM['file-list']) DOM['file-list'].classList.remove('hidden');
-    if (DOM['file-count']) DOM['file-count'].textContent = archivosDetectados.length;
-
-    archivosDetectados.forEach(function(f, i) {
-        const chip = document.createElement('li');
-        chip.className = 'file-chip';
-        chip.style.cssText = 'display:inline-flex; align-items:center; gap:6px; background:#f3f4f6; padding:4px 8px; border-radius:6px; margin:2px; font-size:0.8rem;';
-        chip.innerHTML = getFileTypeIcon(f.type) + ' <span>' + escapeHTML(f.name.length > 25 ? f.name.slice(0, 22) + '...' : f.name) + '</span> <button class="chip-remove" data-index="' + i + '" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer;">&times;</button>';
-        DOM['file-list-items'].appendChild(chip);
-    });
-
-    DOM['file-list-items'].querySelectorAll('.chip-remove').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const idx = parseInt(btn.dataset.index);
-            archivosDetectados.splice(idx, 1);
-            updateFileListUI();
-            if (archivosDetectados.length > 0) processAllFiles();
-            else clearAll();
-        });
-    });
-}
-
-function addError(archivo, mensaje) {
-    if (!DOM['error-panel'] || !DOM['error-list']) return;
-    DOM['error-panel'].classList.remove('hidden');
-    const li = document.createElement('li');
-    li.style.cssText = 'color:#dc2626; margin-bottom:4px; font-size:0.85rem;';
-    li.textContent = '[' + archivo + '] ' + mensaje;
-    DOM['error-list'].appendChild(li);
-}
-
-function clearAll() {
-    if (abortController) abortController.abort();
-    isProcessing = false;
-    resultadosEvaluacion = [];
-    archivosDetectados = [];
-    if (DOM['table-body']) DOM['table-body'].innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#6b7280;">Sube o arrastra archivos para iniciar la evaluación automática.</td></tr>';
-    if (DOM['file-list']) DOM['file-list'].classList.add('hidden');
-    if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
-    if (DOM['error-list']) DOM['error-list'].innerHTML = '';
-    if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = true;
-    if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = true;
-    if (DOM['file-input']) DOM['file-input'].value = '';
-    if (DOM['folder-input']) DOM['folder-input'].value = '';
-}
-
-function exportCSV() {
-    if (resultadosEvaluacion.length === 0) return;
-    let csv = 'Estudiante,C1(6),C2(6),C3(8),Nota Final,Palabras,Bibliografia,Diagnostico Sintetico\n';
-    resultadosEvaluacion.forEach(function(r) {
-        csv += '"' + r.estudiante + '",' + r.c1 + ',' + r.c2 + ',' + r.c3 + ',' + r.notaFinal + ',' + r.wordCount + ',"' + (r.bibliografia.ok ? 'APA OK' : 'NO') + '","' + r.observacion.replace(/"/g, '""') + '"\n';
-    });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }));
-    link.download = 'Evaluaciones_' + new Date().toISOString().slice(0,10) + '.csv';
-    link.click();
-}
-
-function exportPDF() {
-    if (resultadosEvaluacion.length === 0 || !window.jspdf) return;
-    const doc = new window.jspdf.jsPDF('l', 'mm', 'a4');
-    doc.setFontSize(14);
-    doc.text("Reporte de Evaluaciones Académicas", 14, 15);
-    let y = 25;
-    doc.setFontSize(9);
-    doc.text("#", 14, y);
-    doc.text("Estudiante", 25, y);
-    doc.text("C1", 85, y);
-    doc.text("C2", 100, y);
-    doc.text("C3", 115, y);
-    doc.text("Nota", 130, y);
-    doc.text("Diagnóstico Concreto", 145, y);
-    doc.line(14, y + 2, 280, y + 2);
-    y += 8;
-    resultadosEvaluacion.forEach(function(r, idx) {
-        if (y > 180) { doc.addPage(); y = 20; }
-        doc.text(String(idx + 1), 14, y);
-        doc.text(String(r.estudiante).substring(0, 25), 25, y);
-        doc.text(String(r.c1), 85, y);
-        doc.text(String(r.c2), 100, y);
-        doc.text(String(r.c3), 115, y);
-        doc.text(String(r.notaFinal), 130, y);
-        doc.text(String(r.observacion).substring(0, 75), 145, y);
-        y += 7;
-    });
-    doc.save('Evaluaciones_' + new Date().toISOString().slice(0,10) + '.pdf');
-}
-
-// ─── INICIALIZACIÓN ───
-document.addEventListener('DOMContentLoaded', function() {
-    cacheDOM();
-
-    if (typeof pdfjsLib !== 'undefined') {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
-
-    const drop = DOM['drop-zone'];
-    if (drop) {
-        drop.addEventListener('click', function(e) {
-            if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
-                if (DOM['file-input']) DOM['file-input'].click();
-            }
-        });
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(e) {
-            drop.addEventListener(e, function(ev) { 
-                ev.preventDefault(); 
-                ev.stopPropagation(); 
-            });
-        });
-
-        ['dragenter', 'dragover'].forEach(function(e) {
-            drop.addEventListener(e, function() { drop.classList.add('dragover'); });
-        });
-
-        ['dragleave', 'drop'].forEach(function(e) {
-            drop.addEventListener(e, function() { drop.classList.remove('dragover'); });
-        });
-
-        drop.addEventListener('drop', function(ev) {
-            if (ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length > 0) {
-                addFilesToList(ev.dataTransfer.files);
-            }
-        });
-    }
-
-    if (DOM['file-input']) {
-        DOM['file-input'].addEventListener('change', function() {
-            if (this.files && this.files.length > 0) {
-                addFilesToList(this.files);
-                this.value = '';
-            }
-        });
-    }
-
-    if (DOM['folder-input']) {
-        DOM['folder-input'].addEventListener('change', function() {
-            if (this.files && this.files.length > 0) {
-                addFilesToList(this.files);
-                this.value = '';
-            }
-        });
-    }
-
-    if (DOM['btn-folder']) {
-        DOM['btn-folder'].addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (DOM['folder-input']) DOM['folder-input'].click();
-        });
-    }
-
-    if (DOM['btn-clear']) DOM['btn-clear'].addEventListener('click', clearAll);
-
-    if (DOM['btn-cancel']) {
-        DOM['btn-cancel'].addEventListener('click', function() {
-            if (abortController) abortController.abort();
-            isProcessing = false;
-            if (DOM['loading-overlay']) DOM['loading-overlay'].classList.add('hidden');
-        });
-    }
-
-    if (DOM['btn-export-csv']) DOM['btn-export-csv'].addEventListener('click', exportCSV);
-    if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].addEventListener('click', exportPDF);
-
-    if (DOM['filter-input']) {
-        DOM['filter-input'].addEventListener('input', function() {
-            renderTable(this.value);
-        });
-    }
-
-    if (DOM['btn-dismiss-errors']) {
-        DOM['btn-dismiss-errors'].addEventListener('click', function() {
-            if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
-        });
-    }
-});
