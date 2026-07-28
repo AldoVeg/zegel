@@ -1,6 +1,7 @@
 /* ============================================================
    index.js — Motor de Evaluación Heurístico Determinista
-   Con Control de Falsos Positivos y Evaluación Psicométrica
+   Arquitectura: 6 pts (Normativa) + 6 pts (Evidencia) + 8 pts (Ética)
+   Implementa 4 Radares Extra: Conectores, APA, Anti-Subtítulos.
    ============================================================ */
 
 let resultadosEvaluacion = [];
@@ -29,7 +30,6 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag] || tag));
 }
 
-// Normalizador Unicode avanzado
 function normalizeText(text) {
     if (!text) return '';
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -71,38 +71,37 @@ function extractStudentIdentity(fileName, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR DE EVALUACIÓN Y PREVENCIÓN DE FALSOS POSITIVOS
+// MOTOR EXPERTO DE EVALUACIÓN (6-6-8) Y RADARES ADICIONALES
 // ═══════════════════════════════════════════════════════════
 function evaluateContent(fileName, text) {
     const wordCount = text ? text.split(/\s+/).filter(w => w.length > 1).length : 0;
     const estudiante = extractStudentIdentity(fileName, text);
     const normText = normalizeText(text);
 
-    if (wordCount < 30) {
+    if (wordCount < 50) {
         return {
             estudiante: estudiante,
             c1: 0, c1Checks: [false, false, false],
             c2: 0, c2Checks: [false, false, false],
             c3: 0, c3Checks: [false, false, false],
             notaFinal: 0, wordCount: wordCount, bibliografia: { ok: false },
-            observacion: 'Ausenta: Contenido mínimo procesable | Por fortalecer: Extensión e información del documento.'
+            observacion: 'Ausenta: Contenido mínimo. | Por fortalecer: Extensión total del documento.'
         };
     }
 
-    // 1. C1: NORMATIVA (Prevención de falsos positivos: Requiere 2 aciertos o ley explícita)
-    const t1Kw = ['cts', 'compensacion por tiempo', 'gratificacion', 'vacacion', 'asignacion familiar', 'utilidad', 'seguro de vida ley', 'dl 650', 'dl 713', 'ley 27735', 'mype'];
+    // 1. C1: NORMATIVA (2 Puntos por tema = Máx 6 pts)
+    const t1Kw = ['cts', 'compensacion por tiempo', 'gratificacion', 'vacacion', 'asignacion familiar', 'utilidad', 'seguro de vida ley', 'dl 650', 'dl 713', 'ley 27735', 'mype', 'ley 26790'];
     const t2Kw = ['acoso', 'hostigamiento', 'ley 27942', 'dl 1410', 'ds 014-2019-mimp', 'violencia sexual'];
     const t3Kw = ['flexibilidad', 'horario', 'estudiante', 'ley 28518', 'modalidad formativa', 'jornada', 'ds 011-2012-ed'];
 
-    // Para dar check, debe encontrar al menos 2 palabras clave del arreglo, O encontrar la ley específica.
     const hasT1 = (t1Kw.filter(kw => normText.includes(kw)).length >= 2) || normText.includes('ley 27735');
     const hasT2 = (t2Kw.filter(kw => normText.includes(kw)).length >= 2) || normText.includes('ley 27942');
     const hasT3 = (t3Kw.filter(kw => normText.includes(kw)).length >= 2) || normText.includes('ley 28518');
 
     const c1Checks = [hasT1, hasT2, hasT3];
-    const c1Puntos = Math.min(5, Math.round((c1Checks.filter(Boolean).length * (5 / 3)) * 10) / 10);
+    const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
-    // 2. C2: CASOS REALES Y EVIDENCIA
+    // 2. C2: CASOS REALES Y EVIDENCIA (2 Puntos por caso = Máx 6 pts)
     const caseKw = ['http', 'https', 'www', 'sunafil', 'infobae', 'defensoria', 'el peruano', 'noticia', 'caso real', 'denuncia', 'resolucion', 'sentencia'];
     const hasCaseContext = caseKw.some(kw => normText.includes(kw));
 
@@ -111,12 +110,12 @@ function evaluateContent(fileName, text) {
     const hasC3_Case = hasT3 && hasCaseContext;
 
     const c2Checks = [hasC1_Case, hasC2_Case, hasC3_Case];
-    const c2Puntos = Math.min(7, Math.round((c2Checks.filter(Boolean).length * (7 / 3)) * 10) / 10);
+    const c2Puntos = c2Checks.filter(Boolean).length * 2; 
 
-    // 3. C3: ANÁLISIS DE POSTURA ÉTICA Y CORPORATIVA (Diccionarios P1, P2, P3)
-    const p1Kw = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'valor inherente', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social'];
-    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa'];
-    const p3Kw = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'solo se debe cumplir'];
+    // 3. C3: ÉTICA Y ROL RR.HH. (Diccionarios P1, P2, P3 = Máx 8 pts)
+    const p1Kw = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'valor inherente', 'derechos humanos', 'desarrollo integral', 'salud mental', 'tolerancia cero', 'mas alla de la norma', 'responsabilidad social', 'prevencion', 'integridad', 'respeto', 'corresponsabilidad'];
+    const p2Kw = ['sunafil', 'multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion corporativa', 'politicas de la empresa', 'proteccion de los activos', 'productividad'];
+    const p3Kw = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'cultura del sector', 'no es obligatorio', 'trabajador debe adaptarse', 'solo se debe cumplir', 'situacion aislada'];
 
     const p1Hits = p1Kw.filter(kw => normText.includes(kw)).length;
     const p2Hits = p2Kw.filter(kw => normText.includes(kw)).length;
@@ -127,27 +126,40 @@ function evaluateContent(fileName, text) {
     let c3Checks = [false, false, false];
 
     if (p3Hits > 0) {
-        c3Puntos = 2; // Penalidad / Justificadora
-        stanceMsg = 'Postura Deficiente/Justificadora (normaliza malas prácticas)';
+        c3Puntos = 0; // Postura Deficiente (Normaliza el abuso)
+        stanceMsg = 'Postura Justificadora (normaliza malas prácticas)';
         c3Checks = [true, false, false];
     } else if (p1Hits > 0) {
-        c3Puntos = 8; // Puntaje Máximo / Humano
-        stanceMsg = 'Postura Ética y Humana (visión integral de RR.HH.)';
+        c3Puntos = 8; // Postura Ética (Humana)
+        stanceMsg = 'Postura Ética Humana (excelente visión integradora)';
         c3Checks = [true, true, true];
     } else if (p2Hits > 0) {
-        c3Puntos = 5; // Puntaje Medio / Legalista
-        stanceMsg = 'Postura Legalista/Corporativa (enfocada en evitar multas o sanciones)';
+        c3Puntos = 4; // Postura Legalista (Protege la empresa)
+        stanceMsg = 'Postura Legalista-Corporativa (se enfoca solo en evitar contingencias y multas)';
         c3Checks = [true, true, false];
     } else {
-        c3Puntos = 0; // Ausente
-        stanceMsg = 'No se evidencia reflexión estructurada del rol de RR.HH.';
+        c3Puntos = 0;
+        stanceMsg = 'No se evidencia reflexión crítica estructurada';
     }
 
-    // 4. BIBLIOGRAFÍA Y NOTA FINAL
-    const hasBib = ['bibliografia', 'referencia', 'fuente', 'http', 'https', 'recuperado de'].some(kw => normText.includes(kw));
-    const notaFinal = Math.min(20, Math.round((c1Puntos + c2Puntos + c3Puntos) * 10) / 10);
+    // 4. RADARES ADICIONALES (El Filtro de Oro)
+    let fortalezasExtra = [];
 
-    // 5. CONSTRUCCIÓN DEL DIAGNÓSTICO SINTÉTICO (Solo Ausencias y Fortalezas)
+    // Radar 1: Formato APA (Busca un año (YYYY) cerca de una fuente)
+    const hasAPA = /\(\d{4}\).{0,60}?(recuperado|http|www|ley|resolucion)/i.test(text);
+    if (!hasAPA) fortalezasExtra.push('Formato APA en bibliografía');
+
+    // Radar 2: Conectores Lógicos
+    const conectores = ['sin embargo', 'por lo tanto', 'en consecuencia', 'debido a', 'adicionalmente', 'en conclusion', 'no obstante', 'asimismo', 'por ende', 'es decir'];
+    const numConectores = conectores.filter(c => normText.includes(c)).length;
+    if (numConectores < 3) fortalezasExtra.push('Uso de conectores lógicos de causa/efecto');
+
+    // Radar 3: Anti-Copiar/Pegar (Subtítulos de la rúbrica)
+    const subtitulosProhibidos = ['tema 1:', 'parte 1', 'parte 2', 'reflexion final (', 'tema 2:', 'tema 3:'];
+    const tieneSubtitulos = subtitulosProhibidos.some(sub => normText.includes(sub));
+    if (tieneSubtitulos) fortalezasExtra.push('Redacción narrativa fluida (eliminar subtítulos forzados)');
+
+    // 5. CONSTRUCCIÓN DEL DIAGNÓSTICO
     const ausentaArr = [];
     if (!hasT1) ausentaArr.push('T1 (Beneficios)');
     if (!hasT2) ausentaArr.push('T2 (Acoso)');
@@ -156,15 +168,16 @@ function evaluateContent(fileName, text) {
     if (!hasC2_Case && hasT2) ausentaArr.push('Caso T2');
     if (!hasC3_Case && hasT3) ausentaArr.push('Caso T3');
 
-    let diagnostico = "";
-    if (ausentaArr.length > 0) {
-        diagnostico += `Ausenta: ${ausentaArr.join(', ')}. | `;
-    } else {
-        diagnostico += `Ausenta: Ningún requerimiento estructural. | `;
-    }
+    let diagnostico = `Ausenta: ${ausentaArr.length > 0 ? ausentaArr.join(', ') : 'Ningún requerimiento principal'}. | `;
     
-    // Anexamos el análisis cualitativo de la postura detectada
-    diagnostico += `Por fortalecer: ${stanceMsg}.`;
+    diagnostico += `Por fortalecer: ${stanceMsg}`;
+    if (fortalezasExtra.length > 0) {
+        diagnostico += `, ${fortalezasExtra.join(', ')}.`;
+    } else {
+        diagnostico += `.`;
+    }
+
+    const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
 
     return {
         estudiante: estudiante,
@@ -173,7 +186,7 @@ function evaluateContent(fileName, text) {
         c3: c3Puntos, c3Checks: c3Checks,
         notaFinal: notaFinal,
         wordCount: wordCount,
-        bibliografia: { ok: hasBib },
+        bibliografia: { ok: hasAPA }, // Ahora el check verde requiere APA
         observacion: diagnostico
     };
 }
@@ -280,9 +293,9 @@ async function processAllFiles() {
     }
 }
 
-// ─── RENDERIZADO VISUAL ───
+// ─── RENDERIZADO VISUAL EN LA TABLA ───
 function renderPill(label, isOk) {
-    if (!isOk) return ''; // Se omite si no aplica
+    if (!isOk) return ''; 
     return `<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">${label}</span>`;
 }
 
@@ -323,23 +336,22 @@ function renderTable(filterText = '') {
     }
 
     filtered.forEach((r, idx) => {
-        const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ Con Fuentes</span>' : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
+        const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:700; font-size:0.8rem;">✓ Estructura APA</span>' : '<span style="color:#9ca3af; font-size:0.8rem;">—</span>';
 
         const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
         const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]) || '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
         
-        // Adaptamos C3 para mostrar el nivel de Postura (P1, P2, P3) visualmente
         let c3Pills = '<span style="color:#9ca3af; font-size:0.75rem;">—</span>';
-        if (r.c3 === 8) c3Pills = renderPill('Ética-Humana', true);
-        else if (r.c3 === 5) c3Pills = renderPill('Legalista', true);
-        else if (r.c3 === 2) c3Pills = renderPill('Deficiente', true);
+        if (r.c3 === 8) c3Pills = renderPill('Humano (8p)', true);
+        else if (r.c3 === 4) c3Pills = renderPill('Legalista (4p)', true);
+        else if (r.c3Checks[0]) c3Pills = renderPill('Deficiente (0p)', true);
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="text-align:center; font-weight:600; color:#6b7280; font-size:0.85rem;">${idx + 1}</td>
             <td style="font-weight:600; color:#111827; font-size:0.85rem;">${escapeHTML(r.estudiante)}</td>
-            <td style="text-align:center;">${renderScoreBadge(r.c1, 5)}<br><div style="margin-top:3px;">${c1Pills}</div></td>
-            <td style="text-align:center;">${renderScoreBadge(r.c2, 7)}<br><div style="margin-top:3px;">${c2Pills}</div></td>
+            <td style="text-align:center;">${renderScoreBadge(r.c1, 6)}<br><div style="margin-top:3px;">${c1Pills}</div></td>
+            <td style="text-align:center;">${renderScoreBadge(r.c2, 6)}<br><div style="margin-top:3px;">${c2Pills}</div></td>
             <td style="text-align:center;">${renderScoreBadge(r.c3, 8)}<br><div style="margin-top:3px;">${c3Pills}</div></td>
             <td style="text-align:center;">${renderFinalBadge(r.notaFinal)}</td>
             <td style="text-align:center; font-size:0.8rem; color:#4b5563;">${r.wordCount} pal.</td>
@@ -366,7 +378,7 @@ function addFilesToList(files) {
     }
     if (addedAny) {
         updateFileListUI();
-        processAllFiles(); // DISPARO AUTOMÁTICO
+        processAllFiles(); 
     }
 }
 
@@ -410,17 +422,18 @@ function clearAll() {
     archivosDetectados = [];
     if (DOM['table-body']) DOM['table-body'].innerHTML = '<tr><td colspan="9" class="empty-msg">Sube o arrastra archivos para iniciar la evaluación automática.</td></tr>';
     if (DOM['file-list']) DOM['file-list'].classList.add('hidden');
+    if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
     if (DOM['btn-export-pdf']) DOM['btn-export-pdf'].disabled = true;
     if (DOM['btn-export-csv']) DOM['btn-export-csv'].disabled = true;
-    if (DOM['btn-clear']) DOM['btn-clear'].disabled = true;
+    if (DOM['file-input']) DOM['file-input'].value = '';
+    if (DOM['folder-input']) DOM['folder-input'].value = '';
 }
 
-// Exportación CSV / PDF omitida para abreviar (mismo código anterior)
 function exportCSV() {
     if (resultadosEvaluacion.length === 0) return;
-    let csv = 'Estudiante,C1,C2,C3,Nota Final,Palabras,Bibliografia,Diagnostico Sintetico\n';
+    let csv = 'Estudiante,C1(6),C2(6),C3(8),Nota Final,Palabras,Bibliografia,Diagnostico Sintetico\n';
     resultadosEvaluacion.forEach(r => {
-        csv += `"${r.estudiante}",${r.c1},${r.c2},${r.c3},${r.notaFinal},${r.wordCount},"${r.bibliografia.ok ? 'SI' : 'NO'}","${r.observacion.replace(/"/g, '""')}"\n`;
+        csv += `"${r.estudiante}",${r.c1},${r.c2},${r.c3},${r.notaFinal},${r.wordCount},"${r.bibliografia.ok ? 'APA OK' : 'NO'}","${r.observacion.replace(/"/g, '""')}"\n`;
     });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }));
