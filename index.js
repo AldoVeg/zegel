@@ -1,6 +1,7 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
    Procesamiento Seguro | Filtros Minuciosos | Pastillas Visuales
+   (FORTALECIDO: Diccionarios Masivos y Casos Desvinculados)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -183,27 +184,49 @@ async function extractTextFromDOCX(file) {
     return result.value || '';
 }
 
+async function extractFilesFromZip(zipFile) {
+    let extracted = [];
+    if (typeof JSZip === 'undefined') throw new Error("La librería JSZip no está cargada.");
+    const zip = await JSZip.loadAsync(zipFile);
+    const entries = Object.values(zip.files).filter(entry => !entry.dir);
+
+    for (let i = 0; i < entries.length; i++) {
+        const zipEntry = entries[i];
+        const lower = zipEntry.name.toLowerCase();
+        if (lower.endsWith('.pdf') || lower.endsWith('.docx')) {
+            let blob = await zipEntry.async('blob');
+            let file = new File([blob], zipEntry.name.split('/').pop(), {
+                type: lower.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            });
+            extracted.push({ name: file.name, type: lower.endsWith('.pdf') ? 'pdf' : 'docx', file: file, size: blob.size });
+            blob = null;
+        }
+        if (i % 3 === 0) await yieldUI();
+    }
+    return extracted;
+}
+
 // ═══════════════════════════════════════════════════════════
-// MOTOR HEURÍSTICO MINUCIOSO (FORTALECIDO "ANTI-ANDREA")
+// MOTOR HEURÍSTICO MINUCIOSO (DICCIONARIOS MASIVOS & LÓGICA DESVINCULADA)
 // ═══════════════════════════════════════════════════════════
 
 const DICCIONARIO = {
     T1: {
-        normas: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'ds 005 2012', 'ley 25129', 'ley 26790', 'ley 30056'],
-        conceptos: ['seguridad y salud', 'cts', 'compensacion por tiempo', 'gratificacion', 'asignacion familiar', 'utilidades', 'descanso vacacional', 'horas extras', 'riesgos laborales', 'seguro de vida ley', 'beneficios sociales']
+        normas: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'ds 005 2012', 'ley 25129', 'ley 26790', 'ley 30056', 'sst'],
+        conceptos: ['seguridad y salud', 'cts', 'compensacion por tiempo', 'gratificacion', 'asignacion familiar', 'utilidades', 'descanso vacacional', 'horas extras', 'riesgos laborales', 'seguro de vida ley', 'beneficios sociales', 'jornada laboral', 'remuneracion', 'implementos de seguridad', 'epps', 'accidente de trabajo']
     },
     T2: {
         normas: ['ley 27942', 'convenio 190', 'ds 014 2019', 'ley 31156', 'dl 1410'],
-        conceptos: ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'comite frente al hostigamiento']
+        conceptos: ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'comite frente al hostigamiento', 'prevencion del acoso', 'medidas de proteccion', 'investigacion de acoso']
     },
     T3: {
         normas: ['ley 28518', 'ds 011 2012', 'ley 31396'],
-        conceptos: ['modalidad formativa', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'subvencion economica', 'facilidades horarias', 'practicante']
+        conceptos: ['modalidad formativa', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'subvencion economica', 'facilidades horarias', 'practicante', 'plan especifico de aprendizaje', 'formacion laboral']
     },
     NARRATIVA_CASO: {
-        actores: ['trabajador', 'trabajadora', 'empleador', 'empresa', 'colaborador', 'demandante', 'gerente', 'jefe', 'practicante', 'victima', 'sindicato', 'recursos humanos', 'operario'],
-        conflictos: ['despidio', 'incumplio', 'vulnero', 'sufrio', 'acoso', 'accidento', 'omitio', 'afecto', 'obligo', 'coacciono', 'no pago', 'accidente de trabajo', 'infraccion'],
-        contextoLegal: ['demando', 'sanciono', 'reclamo', 'denuncio', 'multo', 'sunafil', 'tribunal constitucional', 'corte suprema', 'expediente', 'casacion', 'resolucion', 'sentencia', 'inspeccion', 'queja formal']
+        actores: ['trabajador', 'trabajadora', 'empleado', 'empleada', 'empleador', 'empresa', 'colaborador', 'colaboradora', 'demandante', 'gerente', 'jefe', 'jefatura', 'supervisor', 'practicante', 'victima', 'inspector', 'sindicato', 'recursos humanos', 'rrhh', 'operario', 'personal'],
+        conflictos: ['despidio', 'incumplio', 'vulnero', 'sufrio', 'acoso', 'accidento', 'omitio', 'afecto', 'obligo', 'coacciono', 'no pago', 'falta de pago', 'exceso de horas', 'despido arbitrario', 'hostigo', 'negligencia', 'infraccion', 'vulneracion', 'abuso'],
+        contextoLegal: ['demando', 'sanciono', 'reclamo', 'denuncio', 'multo', 'sunafil', 'tribunal constitucional', 'corte suprema', 'expediente', 'casacion', 'resolucion', 'sentencia', 'inspeccion', 'queja formal', 'ministerio de trabajo', 'mtpe', 'poder judicial', 'jurisprudencia', 'demanda laboral']
     }
 };
 
@@ -237,11 +260,11 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // Separación en bloques semánticos
+    // Separación en bloques semánticos (Párrafos u oraciones largas)
     const bloques = text
         .split(/(?:\r?\n){2,}|\.\s+/)
         .map(p => normalizeText(p))
-        .filter(p => p.length > 30);
+        .filter(p => p.length > 20);
 
     let palabrasT1 = 0, palabrasT2 = 0, palabrasT3 = 0;
     let hasT1_Case = false, hasT2_Case = false, hasT3_Case = false;
@@ -249,6 +272,7 @@ function evaluateContent(fileName, text) {
     bloques.forEach(bloque => {
         const palabrasEnBloque = bloque.split(/\s+/).length;
 
+        // ¿El bloque menciona algún tema?
         const esT1 = DICCIONARIO.T1.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T1.conceptos.some(kw => bloque.includes(kw));
         const esT2 = DICCIONARIO.T2.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T2.conceptos.some(kw => bloque.includes(kw));
         const esT3 = DICCIONARIO.T3.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T3.conceptos.some(kw => bloque.includes(kw));
@@ -257,6 +281,7 @@ function evaluateContent(fileName, text) {
         if (esT2) palabrasT2 += palabrasEnBloque;
         if (esT3) palabrasT3 += palabrasEnBloque;
 
+        // Detección Estricta de Casos Narrados (C2)
         const tieneActor = DICCIONARIO.NARRATIVA_CASO.actores.some(kw => bloque.includes(kw));
         const tieneConflicto = DICCIONARIO.NARRATIVA_CASO.conflictos.some(kw => bloque.includes(kw));
         const tieneContextoLegal = DICCIONARIO.NARRATIVA_CASO.contextoLegal.some(kw => bloque.includes(kw));
@@ -269,8 +294,8 @@ function evaluateContent(fileName, text) {
         }
     });
 
-    // ─── C1: Filtro de Densidad (Mínimo 45 palabras por tema para ser válido) ───
-    const UMBRAL_PALABRAS = 45; 
+    // ─── C1: Filtro de Densidad (Mínimo 35 palabras por tema para ser válido) ───
+    const UMBRAL_PALABRAS = 35; 
     const hasT1_Norm = palabrasT1 >= UMBRAL_PALABRAS;
     const hasT2_Norm = palabrasT2 >= UMBRAL_PALABRAS;
     const hasT3_Norm = palabrasT3 >= UMBRAL_PALABRAS;
@@ -278,18 +303,16 @@ function evaluateContent(fileName, text) {
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
     const c1Puntos = c1Checks.filter(Boolean).length * 2; 
 
-    // ─── C2: Casos Reales (Efecto Dominó: Requieren marco teórico válido) ───
-    const c2Checks = [
-        hasT1_Case && hasT1_Norm, 
-        hasT2_Case && hasT2_Norm, 
-        hasT3_Case && hasT3_Norm
-    ];
+    // ─── C2: Casos Reales (Efecto Dominó Desvinculado) ───
+    // AHORA: Si narró un caso excelentemente (ej. Preeliminar), se le dan los puntos de C2 
+    // aunque su teoría (C1) haya sido corta o insuficiente.
+    const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
     const c2Puntos = c2Checks.filter(Boolean).length * 2; 
 
-    // ─── C3: Ética Escalonada ───
-    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto'];
-    const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion'];
-    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'no es obligatorio', 'trabajador debe adaptarse'];
+    // ─── C3: Ética Escalonada (Diccionario masivo para capturar a "Lesly") ───
+    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima laboral', 'cultura organizacional', 'desarrollo humano', 'salud ocupacional', 'buenas practicas', 'enfoque preventivo', 'calidad de vida'];
+    const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion', 'costos laborales'];
+    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'no es obligatorio', 'trabajador debe adaptarse', 'exceso de proteccionismo'];
 
     const hitHumanista = kwHumanista.filter(k => normText.includes(k)).length;
     const hitLegalista = kwLegalista.filter(k => normText.includes(k)).length;
@@ -304,7 +327,7 @@ function evaluateContent(fileName, text) {
     } else if (hitHumanista >= 2) {
         if (c1Puntos === 6 && c2Puntos === 6) {
             c3Puntos = 8;
-            stanceMsg = 'Ética Impecable (Desarrollo completo)';
+            stanceMsg = 'Ética Impecable (Postura Humana Integral)';
         } else if (c1Puntos >= 4 && c2Puntos >= 4) {
             c3Puntos = 6;
             stanceMsg = 'Ética Buena (Presenta omisiones temáticas)';
@@ -317,23 +340,23 @@ function evaluateContent(fileName, text) {
         stanceMsg = 'Ética Legalista (Enfocada en evitar multas)';
     } else {
         c3Puntos = 0;
-        stanceMsg = 'Sin reflexión crítica clara';
+        stanceMsg = 'Sin reflexión crítica personal';
     }
 
-    // ─── Diagnóstico ───
+    // ─── Diagnóstico Sintético (Solo lo ausente) ───
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
     
     const ausencias = [];
-    if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1(Insuficiente)' : 'T1(Ausente)');
-    if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2(Insuficiente)' : 'T2(Ausente)');
-    if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3(Insuficiente)' : 'T3(Ausente)');
-    if (!c2Checks[0] && hasT1_Norm) ausencias.push('Caso T1');
-    if (!c2Checks[1] && hasT2_Norm) ausencias.push('Caso T2');
-    if (!c2Checks[2] && hasT3_Norm) ausencias.push('Caso T3');
+    if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 teórica (Insuficiente)' : 'T1 teórica (Ausente)');
+    if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 teórica (Insuficiente)' : 'T2 teórica (Ausente)');
+    if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3 teórica (Insuficiente)' : 'T3 teórica (Ausente)');
+    if (!hasT1_Case) ausencias.push('Caso T1');
+    if (!hasT2_Case) ausencias.push('Caso T2');
+    if (!hasT3_Case) ausencias.push('Caso T3');
 
     let diagnostico = '';
     if (ausencias.length > 0) diagnostico += 'Falta desarrollar: ' + ausencias.join(', ') + '. | ';
-    else diagnostico += 'Desarrollo conforme. | ';
+    else diagnostico += 'Desarrollo conforme a estructura. | ';
     
     diagnostico += stanceMsg + '.';
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
@@ -350,11 +373,12 @@ function evaluateContent(fileName, text) {
     };
 }
 
-// ─── Interfaz y Tabla ───
+// ─── Interfaz y Tabla (Restauración de Pastillas Visuales) ───
 function renderPill(label, isOk) {
     if (isOk) {
         return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
     } else {
+        // Color Gris para indicar "Ausente"
         return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#f3f4f6; color:#9ca3af; border:1px solid #d1d5db;">' + label + '</span>';
     }
 }
@@ -441,7 +465,6 @@ async function processAllFiles() {
     isProcessing = true;
     abortController = new AbortController();
     
-    // Solo vaciamos la tabla de resultados para regenerarla, pero no destruimos los archivos subidos.
     resultadosEvaluacion = [];
     
     if (DOM['loading-overlay']) DOM['loading-overlay'].classList.remove('hidden');
@@ -467,6 +490,11 @@ async function processAllFiles() {
                     text = await extractTextFromPDF(item.file);
                 } else if (item.type === 'docx') {
                     text = await extractTextFromDOCX(item.file);
+                } else if (item.type === 'zip') {
+                    // Extraer los zips en cola
+                    let extracted = await extractFilesFromZip(item.file);
+                    archivosDetectados.push(...extracted);
+                    continue; // Pasa al siguiente archivo
                 }
 
                 if (!text || text.trim().length < 20) {
@@ -529,6 +557,22 @@ function setupEvents() {
         });
     }
     
+    if (DOM['folder-input']) {
+        DOM['folder-input'].addEventListener('change', async function(e) {
+            if (this.files.length > 0) {
+                await addFilesToList(this.files);
+                this.value = '';
+                processAllFiles();
+            }
+        });
+    }
+
+    if (DOM['btn-folder']) {
+        DOM['btn-folder'].addEventListener('click', function() {
+            if (DOM['folder-input']) DOM['folder-input'].click();
+        });
+    }
+
     if (DOM['btn-clear']) {
         DOM['btn-clear'].addEventListener('click', function() {
             if (abortController) abortController.abort();
@@ -563,7 +607,7 @@ function setupEvents() {
 // ─── Inicialización Absoluta ───
 function init() {
     cacheDOM();
-    setupEvents(); // Encendemos la interactividad inmediatamente
+    setupEvents(); // Encendemos la interactividad inmediatamente para que NO se bloquee
     checkDependencies(); // Advertimos si falta algo, pero NO bloqueamos
     configurePDFJS();
 }
