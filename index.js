@@ -1,6 +1,6 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
-   Agrupador de Viñetas | Pipeline de Detección C2 | Pastillas Visuales
+   (FORTALECIDO: Normalización N°, C3 Desacoplado, Umbral 20)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -26,7 +26,7 @@ function checkDependencies() {
     if (alertEl && alertText) {
         if (missing.length > 0) {
             alertEl.classList.remove('hidden');
-            alertText.textContent = 'Aviso: Faltan librerías (' + missing.join(', ') + ').';
+            alertText.textContent = 'Aviso: Faltan librerías (' + missing.join(', ') + '). Algunas funciones podrían no estar disponibles.';
         } else {
             alertEl.classList.add('hidden');
         }
@@ -69,6 +69,8 @@ function detectFileType(file) {
 
 function normalizeText(text) {
     return text.toLowerCase()
+        // 1. Elimina N°, Nº, N. y espacios previos a números (ej. Ley N° 27735 -> ley 27735)
+        .replace(/n[°º\.]?\s*(?=\d)/g, '') 
         .replace(/[áäâà]/g, 'a').replace(/[éëêè]/g, 'e').replace(/[íïîì]/g, 'i')
         .replace(/[óöôò]/g, 'o').replace(/[úüûù]/g, 'u')
         .replace(/ñ/g, 'ni')
@@ -82,12 +84,15 @@ let resultadosEvaluacion = [];
 let archivosDetectados = [];
 let abortController = null;
 let isProcessing = false;
+let sortColumn = null;
+let sortDirection = 'asc';
 
 const DOM = {};
 function cacheDOM() {
     const ids = [
         'drop-zone', 'file-input', 'folder-input', 'btn-folder',
         'file-list', 'file-list-items', 'file-count',
+        'stat-pdf', 'stat-docx', 'stat-zip',
         'status-text', 'progress-bar',
         'btn-clear', 'btn-export-pdf', 'btn-export-csv',
         'error-panel', 'error-list', 'btn-dismiss-errors',
@@ -98,7 +103,7 @@ function cacheDOM() {
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }
 
-// ─── Gestión de Archivos ───
+// ─── Gestión de UI de Archivos ───
 function updateFileListUI() {
     const listEl = DOM['file-list-items'];
     const fileList = DOM['file-list'];
@@ -144,12 +149,7 @@ async function addFilesToList(files) {
         if (validTypes.includes(type)) {
             const isDuplicate = archivosDetectados.some(f => f.name === files[i].name && f.size === files[i].size);
             if (!isDuplicate) {
-                archivosDetectados.push({
-                    name: files[i].name,
-                    type: type,
-                    file: files[i],
-                    size: files[i].size
-                });
+                archivosDetectados.push({ name: files[i].name, type: type, file: files[i], size: files[i].size });
                 added++;
             }
         }
@@ -163,7 +163,6 @@ async function extractTextFromPDF(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
-
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
@@ -181,15 +180,16 @@ async function extractTextFromDOCX(file) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR AUDITOR: DICCIONARIOS & PIPELINE DE CASOS REALES
+// MOTOR AUDITOR: DICCIONARIOS Y EVALUACIÓN
 // ═══════════════════════════════════════════════════════════
 
 const DICCIONARIOS = {
     T1: {
         keywords: [
-            'ley 29783', 'ley 27735', 'dl 650', 'dl 713', 'dl 892', 'dl 854', 'ds 005 2012', 'ds 007 2002', 'ley 25129', 'ley 26790', 
+            'ley 29783', 'ley 27735', 'dl 650', 'dl 713', 'dl 892', 'dl 854', 'ley 854', 'ds 005 2012', 'ds 007 2002', 'ley 25129', 'ley 26790', 
             'sst', 'beneficios laborales', 'gratificacion', 'gratificaciones', 'cts', 'vacaciones', 'asignacion familiar', 'utilidades', 
-            'horas extras', 'seguridad y salud', 'salud ocupacional', 'riesgos laborales', 'enfermedades ocupacionales', 'lesiones laborales'
+            'horas extras', 'seguridad y salud', 'salud ocupacional', 'riesgos laborales', 'enfermedades ocupacionales', 'lesiones laborales',
+            'compensacion', 'tiempos de servicios' // Agregado para "Lesly"
         ]
     },
     T2: {
@@ -208,9 +208,8 @@ const DICCIONARIOS = {
     }
 };
 
-// PIPELINE DE DETECCIÓN DE CASOS REALES (C2)
 const PATRONES_CASO = {
-    evidenciaDirecta: ['http', 'https', 'www', '.pe', '.com', 'gob.pe', 'equidad.pe', 'infobae', 'la republica', 'el peruano', 'cronicaviva', 'defensoria', 'sunafil', 'minedu', 'rpp', 'noticia', 'diario', 'fuente', 'segun', 'informo', 'comunicado', 'reporto'],
+    evidenciaDirecta: ['http', 'https', 'www', '.pe', '.com', 'gob.pe', 'equidad.pe', 'infobae', 'la republica', 'el peruano', 'cronicaviva', 'defensoria', 'sunafil', 'minedu', 'rpp', 'noticia', 'diario', 'fuente', 'segun', 'informo', 'comunicado', 'reporto', 'denuncia', 'en 202'],
     actores: ['trabajador', 'emplead', 'colaborad', 'demandant', 'gerent', 'jef', 'supervis', 'practicant', 'victim', 'inspect', 'sindicat', 'rrhh', 'docent', 'joven', 'personal', 'empresa', 'ripley', 'arcos dorados', 'call center', 'ministerio'],
     accionesConflictivas: ['despid', 'incumpl', 'vulner', 'sufri', 'acos', 'accident', 'omiti', 'afect', 'oblig', 'coaccion', 'pago', 'hostig', 'negligenci', 'infracci', 'abuso', 'denunci', 'huelg', 'reclam', 'sancion', 'mult', 'destitu', 'lesion', 'renunci']
 };
@@ -234,7 +233,8 @@ function evaluateContent(fileName, text) {
     const estudiante = extractStudentIdentity(fileName, text);
     const normText = normalizeText(text);
 
-    if (wordCount < 40) {
+    // Bajar validación de documento mínimo a 20 palabras
+    if (wordCount < 20) {
         return {
             estudiante: estudiante,
             c1: 0, c1Checks: [false, false, false],
@@ -246,12 +246,15 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // Limpieza e Integración de Viñetas y Secciones
-    const bloquesProcesados = text
-        .replace(/[\•\-\*]/g, ' ') // Remueve viñetas para unificar la lectura
+    // 1. Unificar viñetas (Agrupa los puntos de "Preeliminar" en un bloque continuo)
+    let textoAgrupado = text.replace(/\n(?=[\•\-\*])/g, ' '); 
+
+    // 2. Limpieza e Integración de Secciones
+    const bloquesProcesados = textoAgrupado
+        .replace(/[\•\-\*]/g, ' ') 
         .split(/(?:\r?\n){2,}|\n(?=[A-Z0-9\s]{4,}:)/)
         .map(b => normalizeText(b))
-        .filter(b => b.length > 20);
+        .filter(b => b.length > 15);
 
     let t1Words = 0, t2Words = 0, t3Words = 0;
     let hasT1_Case = false, hasT2_Case = false, hasT3_Case = false;
@@ -280,7 +283,7 @@ function evaluateContent(fileName, text) {
         const tieneActor = PATRONES_CASO.actores.some(kw => bloque.includes(kw));
         const tieneAccion = PATRONES_CASO.accionesConflictivas.some(kw => bloque.includes(kw));
 
-        // Validación de Caso Real: (Evidencia Directa/URL) O (Actor + Acción Conflictiva)
+        // Caso validado: (Evidencia Directa/URL) O (Actor + Acción Conflictiva)
         const esCasoValido = tieneEvidencia || (tieneActor && tieneAccion);
 
         if (esCasoValido && currentTopic) {
@@ -290,8 +293,8 @@ function evaluateContent(fileName, text) {
         }
     });
 
-    // ─── C1: Filtro Teórico (35 Palabras Mínimas por Tema) ───
-    const UMBRAL = 35;
+    // ─── C1: Filtro Teórico (UMBRAL BAJADO A 20 PALABRAS) ───
+    const UMBRAL = 20;
     const hasT1_Norm = t1Words >= UMBRAL;
     const hasT2_Norm = t2Words >= UMBRAL;
     const hasT3_Norm = t3Words >= UMBRAL;
@@ -299,12 +302,12 @@ function evaluateContent(fileName, text) {
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
     const c1Puntos = c1Checks.filter(Boolean).length * 2;
 
-    // ─── C2: Casos Reales (Efecto Desvinculado) ───
+    // ─── C2: Casos Reales ───
     const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
     const c2Puntos = c2Checks.filter(Boolean).length * 2;
 
-    // ─── C3: Ética y Postura Crítica ───
-    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima laboral', 'salud ocupacional', 'buenas practicas', 'calidad de vida'];
+    // ─── C3: Ética y Postura Crítica (TOTALMENTE DESACOPLADO DE C1/C2) ───
+    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima laboral', 'salud ocupacional', 'buenas practicas', 'calidad de vida', 'agente de transformacion', 'escudo protector', 'canal neutral', 'responsabilidad etica'];
     const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion', 'costos laborales'];
     const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'informalidad', 'no es obligatorio', 'exceso de proteccionismo'];
 
@@ -319,16 +322,11 @@ function evaluateContent(fileName, text) {
         c3Puntos = 0;
         stanceMsg = 'Ética Deficiente (justifica malas prácticas)';
     } else if (hitHumanista >= 2) {
-        if (c1Puntos >= 4 && c2Puntos >= 4) {
-            c3Puntos = 8;
-            stanceMsg = 'Ética Impecable (Postura Humana Integral)';
-        } else if (c1Puntos >= 2 || c2Puntos >= 2) {
-            c3Puntos = 6;
-            stanceMsg = 'Ética Buena (Presenta omisiones temáticas)';
-        } else {
-            c3Puntos = 4;
-            stanceMsg = 'Ética Parcial (Vacíos en normas o casos)';
-        }
+        c3Puntos = 8; // Obtiene 8 puntos directo por excelente reflexión ética
+        stanceMsg = 'Ética Impecable (Postura Humana Integral)';
+    } else if (hitHumanista === 1) {
+        c3Puntos = 6;
+        stanceMsg = 'Ética Buena (Reflexión presente pero breve)';
     } else if (hitLegalista >= 1) {
         c3Puntos = 4;
         stanceMsg = 'Ética Legalista (Enfocada en evitar sanciones)';
@@ -337,7 +335,7 @@ function evaluateContent(fileName, text) {
         stanceMsg = 'Sin reflexión crítica personal';
     }
 
-    // ─── Diagnóstico Sintético ───
+    // ─── Diagnóstico Sintético de Omisiones ───
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText) || normText.includes('recuperado de');
     
     const ausencias = [];
@@ -367,7 +365,7 @@ function evaluateContent(fileName, text) {
     };
 }
 
-// ─── Interfaz y Renderizado ───
+// ─── Interfaz y Tabla ───
 function renderPill(label, isOk) {
     if (isOk) {
         return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
