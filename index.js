@@ -1,6 +1,6 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
-   (FORTALECIDO: Normalización N°, C3 Desacoplado, Umbral 20)
+   (FORTALECIDO: Anti-Fragmentación PDF, Ventana de Contexto C2)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -69,8 +69,9 @@ function detectFileType(file) {
 
 function normalizeText(text) {
     return text.toLowerCase()
-        // 1. Elimina N°, Nº, N. y espacios previos a números (ej. Ley N° 27735 -> ley 27735)
-        .replace(/n[°º\.]?\s*(?=\d)/g, '') 
+        // Remover formatos sucios de PDF (N°, N.°, N.º, etc.)
+        .replace(/n[.°º\s]+(?=\d)/g, '') 
+        .replace(/\$n\^\{\\circ\}\$/g, '') 
         .replace(/[áäâà]/g, 'a').replace(/[éëêè]/g, 'e').replace(/[íïîì]/g, 'i')
         .replace(/[óöôò]/g, 'o').replace(/[úüûù]/g, 'u')
         .replace(/ñ/g, 'ni')
@@ -166,6 +167,7 @@ async function extractTextFromPDF(file) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
+        // Para evitar fragmentación, unimos con espacio, no con salto de línea.
         fullText += textContent.items.map(item => item.str).join(' ') + '\n';
         page.cleanup();
     }
@@ -180,7 +182,7 @@ async function extractTextFromDOCX(file) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR AUDITOR: DICCIONARIOS Y EVALUACIÓN
+// MOTOR AUDITOR: DICCIONARIOS Y LÓGICA DE PATRONES EXHAUSTIVOS
 // ═══════════════════════════════════════════════════════════
 
 const DICCIONARIOS = {
@@ -189,29 +191,29 @@ const DICCIONARIOS = {
             'ley 29783', 'ley 27735', 'dl 650', 'dl 713', 'dl 892', 'dl 854', 'ley 854', 'ds 005 2012', 'ds 007 2002', 'ley 25129', 'ley 26790', 
             'sst', 'beneficios laborales', 'gratificacion', 'gratificaciones', 'cts', 'vacaciones', 'asignacion familiar', 'utilidades', 
             'horas extras', 'seguridad y salud', 'salud ocupacional', 'riesgos laborales', 'enfermedades ocupacionales', 'lesiones laborales',
-            'compensacion', 'tiempos de servicios' // Agregado para "Lesly"
+            'compensacion por tiempo', 'tiempo de servicios'
         ]
     },
     T2: {
         keywords: [
             'ley 27942', 'convenio 190', 'ds 014 2019', 'ley 31156', 'dl 1410', 
             'hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 
-            'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'violencia sexual', 'destituidos', 'destitucion'
+            'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'violencia sexual', 'acoso', 'hostigamiento'
         ]
     },
     T3: {
         keywords: [
             'ley 28518', 'ds 011 2012', 'ley 31396', 'ley general de educacion', 
             'modalidad formativa', 'modalidades formativas', 'practicas preprofesionales', 'practicas profesionales', 
-            'convenio de practicas', 'jornada formativa', 'flexibilidad horaria', 'facilidades horarias', 'empleo juvenil'
+            'convenio de practicas', 'jornada formativa', 'flexibilidad horaria', 'facilidades horarias', 'empleo juvenil', 'jovenes en peru', 'practicas'
         ]
     }
 };
 
 const PATRONES_CASO = {
-    evidenciaDirecta: ['http', 'https', 'www', '.pe', '.com', 'gob.pe', 'equidad.pe', 'infobae', 'la republica', 'el peruano', 'cronicaviva', 'defensoria', 'sunafil', 'minedu', 'rpp', 'noticia', 'diario', 'fuente', 'segun', 'informo', 'comunicado', 'reporto', 'denuncia', 'en 202'],
-    actores: ['trabajador', 'emplead', 'colaborad', 'demandant', 'gerent', 'jef', 'supervis', 'practicant', 'victim', 'inspect', 'sindicat', 'rrhh', 'docent', 'joven', 'personal', 'empresa', 'ripley', 'arcos dorados', 'call center', 'ministerio'],
-    accionesConflictivas: ['despid', 'incumpl', 'vulner', 'sufri', 'acos', 'accident', 'omiti', 'afect', 'oblig', 'coaccion', 'pago', 'hostig', 'negligenci', 'infracci', 'abuso', 'denunci', 'huelg', 'reclam', 'sancion', 'mult', 'destitu', 'lesion', 'renunci']
+    evidencia: ['http', 'https', 'www', '.pe', '.com', 'gob.pe', 'equidad.pe', 'infobae', 'la republica', 'el peruano', 'cronicaviva', 'defensoria', 'sunafil', 'minedu', 'rpp', 'noticia', 'diario', 'fuente', 'segun el informe', 'segun informo', 'comunicado', 'reporto', 'denuncia', 'expediente', 'resolucion', 'sentencia'],
+    actores: ['trabajador', 'emplead', 'colaborad', 'demandant', 'gerent', 'jef', 'supervis', 'practicant', 'victim', 'sindicat', 'docent', 'joven', 'personal', 'empresa', 'ripley', 'arcos dorados', 'call center', 'ministerio'],
+    acciones: ['despid', 'incumpl', 'vulner', 'sufri', 'acos', 'accident', 'omiti', 'afect', 'oblig', 'pago', 'hostig', 'infracci', 'abuso', 'denunci', 'huelg', 'reclam', 'sancion', 'mult', 'destitu', 'lesion', 'renunci']
 };
 
 function extractStudentIdentity(fileName, text) {
@@ -233,8 +235,7 @@ function evaluateContent(fileName, text) {
     const estudiante = extractStudentIdentity(fileName, text);
     const normText = normalizeText(text);
 
-    // Bajar validación de documento mínimo a 20 palabras
-    if (wordCount < 20) {
+    if (wordCount < 30) {
         return {
             estudiante: estudiante,
             c1: 0, c1Checks: [false, false, false],
@@ -246,54 +247,52 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // 1. Unificar viñetas (Agrupa los puntos de "Preeliminar" en un bloque continuo)
-    let textoAgrupado = text.replace(/\n(?=[\•\-\*])/g, ' '); 
-
-    // 2. Limpieza e Integración de Secciones
-    const bloquesProcesados = textoAgrupado
+    // 1. Unificar oraciones de PDF (Anti-Fragmentación)
+    // Agrupa saltos de línea simples, dejando solo los dobles como separación de párrafos
+    const textoAgrupado = text.replace(/([^\n])\n([^\n])/g, '$1 $2');
+    
+    // 2. Separar en bloques significativos
+    const bloques = textoAgrupado
         .replace(/[\•\-\*]/g, ' ') 
-        .split(/(?:\r?\n){2,}|\n(?=[A-Z0-9\s]{4,}:)/)
+        .split(/(?:\r?\n){2,}/)
         .map(b => normalizeText(b))
-        .filter(b => b.length > 15);
+        .filter(b => b.length > 10);
 
     let t1Words = 0, t2Words = 0, t3Words = 0;
     let hasT1_Case = false, hasT2_Case = false, hasT3_Case = false;
-    let activeTopic = null;
 
-    bloquesProcesados.forEach(bloque => {
+    // Escaneo Secuencial con Ventana de Contexto (Amarrar Casos)
+    bloques.forEach((bloque, index) => {
         const palabrasBloque = bloque.split(/\s+/).length;
 
+        // ¿Qué temas se mencionan en este bloque?
         const isT1 = DICCIONARIOS.T1.keywords.some(kw => bloque.includes(kw));
         const isT2 = DICCIONARIOS.T2.keywords.some(kw => bloque.includes(kw));
         const isT3 = DICCIONARIOS.T3.keywords.some(kw => bloque.includes(kw));
 
-        // Determinación del Tema por Contexto
-        if (bloque.includes('tema 1') || (isT1 && !isT2 && !isT3)) activeTopic = 'T1';
-        else if (bloque.includes('tema 2') || (isT2 && !isT1 && !isT3)) activeTopic = 'T2';
-        else if (bloque.includes('tema 3') || bloque.includes('flexibilidad') || (isT3 && !isT1 && !isT2)) activeTopic = 'T3';
+        if (isT1) t1Words += palabrasBloque;
+        if (isT2) t2Words += palabrasBloque;
+        if (isT3) t3Words += palabrasBloque;
 
-        const currentTopic = activeTopic || (isT1 ? 'T1' : isT2 ? 'T2' : isT3 ? 'T3' : null);
-
-        if (currentTopic === 'T1') t1Words += palabrasBloque;
-        if (currentTopic === 'T2') t2Words += palabrasBloque;
-        if (currentTopic === 'T3') t3Words += palabrasBloque;
-
-        // EJECUCIÓN DEL PIPELINE DE CASOS REALES (C2)
-        const tieneEvidencia = PATRONES_CASO.evidenciaDirecta.some(kw => bloque.includes(kw));
+        // Detección de Caso Real (Lógica C2)
+        const tieneEvidencia = PATRONES_CASO.evidencia.some(kw => bloque.includes(kw));
         const tieneActor = PATRONES_CASO.actores.some(kw => bloque.includes(kw));
-        const tieneAccion = PATRONES_CASO.accionesConflictivas.some(kw => bloque.includes(kw));
+        const tieneAccion = PATRONES_CASO.acciones.some(kw => bloque.includes(kw));
 
-        // Caso validado: (Evidencia Directa/URL) O (Actor + Acción Conflictiva)
         const esCasoValido = tieneEvidencia || (tieneActor && tieneAccion);
 
-        if (esCasoValido && currentTopic) {
-            if (currentTopic === 'T1') hasT1_Case = true;
-            if (currentTopic === 'T2') hasT2_Case = true;
-            if (currentTopic === 'T3') hasT3_Case = true;
+        if (esCasoValido) {
+            // Si es un caso, buscamos a qué tema pertenece (en este bloque o el anterior)
+            let bloqueAnterior = index > 0 ? bloques[index - 1] : '';
+            let contextoAmpliando = bloque + ' ' + bloqueAnterior;
+
+            if (DICCIONARIOS.T1.keywords.some(kw => contextoAmpliando.includes(kw))) hasT1_Case = true;
+            if (DICCIONARIOS.T2.keywords.some(kw => contextoAmpliando.includes(kw))) hasT2_Case = true;
+            if (DICCIONARIOS.T3.keywords.some(kw => contextoAmpliando.includes(kw))) hasT3_Case = true;
         }
     });
 
-    // ─── C1: Filtro Teórico (UMBRAL BAJADO A 20 PALABRAS) ───
+    // ─── C1: Filtro Teórico (UMBRAL ÓPTIMO DE 20 PALABRAS) ───
     const UMBRAL = 20;
     const hasT1_Norm = t1Words >= UMBRAL;
     const hasT2_Norm = t2Words >= UMBRAL;
@@ -302,53 +301,53 @@ function evaluateContent(fileName, text) {
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
     const c1Puntos = c1Checks.filter(Boolean).length * 2;
 
-    // ─── C2: Casos Reales ───
+    // ─── C2: Casos Reales (Se premia sin importar C1) ───
     const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
     const c2Puntos = c2Checks.filter(Boolean).length * 2;
 
-    // ─── C3: Ética y Postura Crítica (TOTALMENTE DESACOPLADO DE C1/C2) ───
-    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima laboral', 'salud ocupacional', 'buenas practicas', 'calidad de vida', 'agente de transformacion', 'escudo protector', 'canal neutral', 'responsabilidad etica'];
-    const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion', 'costos laborales'];
-    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'informalidad', 'no es obligatorio', 'exceso de proteccionismo'];
+    // ─── C3: Ética y Postura Crítica (COMPLETAMENTE INDEPENDIENTE) ───
+    const kwEtica = [
+        'dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 
+        'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima organizacional', 
+        'clima laboral', 'salud ocupacional', 'buenas practicas', 'calidad de vida', 'agente de transformacion', 
+        'responsabilidad etica', 'responsabilidad del profesional', 'rol de recursos humanos', 'rol etico'
+    ];
+    const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'evitar sanciones', 'riesgos legales'];
 
-    const hitHumanista = kwHumanista.filter(k => normText.includes(k)).length;
+    const hitEtica = kwEtica.filter(k => normText.includes(k)).length;
     const hitLegalista = kwLegalista.filter(k => normText.includes(k)).length;
-    const hitDeficiente = kwDeficiente.filter(k => normText.includes(k)).length;
 
     let c3Puntos = 0;
     let stanceMsg = '';
 
-    if (hitDeficiente > 0) {
-        c3Puntos = 0;
-        stanceMsg = 'Ética Deficiente (justifica malas prácticas)';
-    } else if (hitHumanista >= 2) {
-        c3Puntos = 8; // Obtiene 8 puntos directo por excelente reflexión ética
+    if (hitEtica >= 2) {
+        c3Puntos = 8;
         stanceMsg = 'Ética Impecable (Postura Humana Integral)';
-    } else if (hitHumanista === 1) {
+    } else if (hitEtica === 1) {
         c3Puntos = 6;
         stanceMsg = 'Ética Buena (Reflexión presente pero breve)';
     } else if (hitLegalista >= 1) {
         c3Puntos = 4;
-        stanceMsg = 'Ética Legalista (Enfocada en evitar sanciones)';
+        stanceMsg = 'Ética Legalista (Enfocada en cumplimiento y sanciones)';
     } else {
         c3Puntos = 0;
-        stanceMsg = 'Sin reflexión crítica personal';
+        stanceMsg = 'Sin reflexión crítica ni ética personal detectada';
     }
 
-    // ─── Diagnóstico Sintético de Omisiones ───
+    // ─── Diagnóstico Sintético ───
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText) || normText.includes('recuperado de');
     
     const ausencias = [];
-    if (!hasT1_Norm) ausencias.push(t1Words > 0 ? 'T1 teórica (Insuficiente)' : 'T1 teórica (Ausente)');
-    if (!hasT2_Norm) ausencias.push(t2Words > 0 ? 'T2 teórica (Insuficiente)' : 'T2 teórica (Ausente)');
-    if (!hasT3_Norm) ausencias.push(t3Words > 0 ? 'T3 teórica (Insuficiente)' : 'T3 teórica (Ausente)');
+    if (!hasT1_Norm) ausencias.push('T1 (Teoría)');
+    if (!hasT2_Norm) ausencias.push('T2 (Teoría)');
+    if (!hasT3_Norm) ausencias.push('T3 (Teoría)');
     if (!hasT1_Case) ausencias.push('Caso T1');
     if (!hasT2_Case) ausencias.push('Caso T2');
     if (!hasT3_Case) ausencias.push('Caso T3');
 
     let diagnostico = '';
     if (ausencias.length > 0) diagnostico += 'Falta desarrollar: ' + ausencias.join(', ') + '. | ';
-    else diagnostico += 'Desarrollo conforme a estructura. | ';
+    else diagnostico += 'Desarrollo conforme a la rúbrica. | ';
     
     diagnostico += stanceMsg + '.';
     const notaFinal = Math.min(20, c1Puntos + c2Puntos + c3Puntos);
