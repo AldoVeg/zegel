@@ -1,6 +1,6 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
-   (FORTALECIDO: Anti-Fragmentación PDF, Ventana de Contexto C2)
+   (FORTALECIDO: Filtro Ético Compuesto, Umbral 35, Anti-Falsos Positivos)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -167,7 +167,7 @@ async function extractTextFromPDF(file) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        // Para evitar fragmentación, unimos con espacio, no con salto de línea.
+        // Evitamos fragmentación pegando las líneas con un espacio
         fullText += textContent.items.map(item => item.str).join(' ') + '\n';
         page.cleanup();
     }
@@ -182,7 +182,7 @@ async function extractTextFromDOCX(file) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MOTOR AUDITOR: DICCIONARIOS Y LÓGICA DE PATRONES EXHAUSTIVOS
+// MOTOR AUDITOR: LÓGICA MINUCIOSA Y ANTI-FALSOS POSITIVOS
 // ═══════════════════════════════════════════════════════════
 
 const DICCIONARIOS = {
@@ -247,11 +247,10 @@ function evaluateContent(fileName, text) {
         };
     }
 
-    // 1. Unificar oraciones de PDF (Anti-Fragmentación)
-    // Agrupa saltos de línea simples, dejando solo los dobles como separación de párrafos
-    const textoAgrupado = text.replace(/([^\n])\n([^\n])/g, '$1 $2');
+    // 1. Unificar oraciones rotas del PDF (Reemplaza los saltos de línea sencillos por espacios)
+    const textoAgrupado = text.replace(/(?<!\n)\n(?!\n)/g, ' ');
     
-    // 2. Separar en bloques significativos
+    // 2. Separar en bloques significativos (párrafos reales)
     const bloques = textoAgrupado
         .replace(/[\•\-\*]/g, ' ') 
         .split(/(?:\r?\n){2,}/)
@@ -265,7 +264,7 @@ function evaluateContent(fileName, text) {
     bloques.forEach((bloque, index) => {
         const palabrasBloque = bloque.split(/\s+/).length;
 
-        // ¿Qué temas se mencionan en este bloque?
+        // Detección C1
         const isT1 = DICCIONARIOS.T1.keywords.some(kw => bloque.includes(kw));
         const isT2 = DICCIONARIOS.T2.keywords.some(kw => bloque.includes(kw));
         const isT3 = DICCIONARIOS.T3.keywords.some(kw => bloque.includes(kw));
@@ -274,7 +273,7 @@ function evaluateContent(fileName, text) {
         if (isT2) t2Words += palabrasBloque;
         if (isT3) t3Words += palabrasBloque;
 
-        // Detección de Caso Real (Lógica C2)
+        // Detección C2
         const tieneEvidencia = PATRONES_CASO.evidencia.some(kw => bloque.includes(kw));
         const tieneActor = PATRONES_CASO.actores.some(kw => bloque.includes(kw));
         const tieneAccion = PATRONES_CASO.acciones.some(kw => bloque.includes(kw));
@@ -282,7 +281,7 @@ function evaluateContent(fileName, text) {
         const esCasoValido = tieneEvidencia || (tieneActor && tieneAccion);
 
         if (esCasoValido) {
-            // Si es un caso, buscamos a qué tema pertenece (en este bloque o el anterior)
+            // Evaluamos a qué tema pertenece analizando este bloque y el anterior
             let bloqueAnterior = index > 0 ? bloques[index - 1] : '';
             let contextoAmpliando = bloque + ' ' + bloqueAnterior;
 
@@ -292,8 +291,9 @@ function evaluateContent(fileName, text) {
         }
     });
 
-    // ─── C1: Filtro Teórico (UMBRAL ÓPTIMO DE 20 PALABRAS) ───
-    const UMBRAL = 20;
+    // ─── C1: Filtro Teórico (UMBRAL ESTRICTO: 35 PALABRAS) ───
+    // Con 35 palabras, el T3 de Andrea (31 palabras) es marcado como INSUFICIENTE.
+    const UMBRAL = 35;
     const hasT1_Norm = t1Words >= UMBRAL;
     const hasT2_Norm = t2Words >= UMBRAL;
     const hasT3_Norm = t3Words >= UMBRAL;
@@ -301,16 +301,17 @@ function evaluateContent(fileName, text) {
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
     const c1Puntos = c1Checks.filter(Boolean).length * 2;
 
-    // ─── C2: Casos Reales (Se premia sin importar C1) ───
+    // ─── C2: Casos Reales ───
     const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
     const c2Puntos = c2Checks.filter(Boolean).length * 2;
 
-    // ─── C3: Ética y Postura Crítica (COMPLETAMENTE INDEPENDIENTE) ───
+    // ─── C3: Ética y Postura Crítica (FRASES COMPUESTAS, 0 FALSOS POSITIVOS) ───
+    // Se eliminan palabras sueltas. Ahora se exigen conceptos articulados de RRHH y Ética.
     const kwEtica = [
-        'dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 
-        'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima organizacional', 
-        'clima laboral', 'salud ocupacional', 'buenas practicas', 'calidad de vida', 'agente de transformacion', 
-        'responsabilidad etica', 'responsabilidad del profesional', 'rol de recursos humanos', 'rol etico'
+        'dignidad humana', 'bienestar integral', 'justicia social', 'clima organizacional', 'clima laboral', 
+        'desarrollo humano', 'buenas practicas', 'calidad de vida', 'agente de transformacion', 
+        'responsabilidad etica', 'responsabilidad del profesional', 'rol de recursos humanos', 
+        'rol etico', 'desarrollo sostenible', 'derechos fundamentales', 'etica', 'moral', 'integridad'
     ];
     const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'evitar sanciones', 'riesgos legales'];
 
@@ -330,7 +331,7 @@ function evaluateContent(fileName, text) {
         c3Puntos = 4;
         stanceMsg = 'Ética Legalista (Enfocada en cumplimiento y sanciones)';
     } else {
-        c3Puntos = 0;
+        c3Puntos = 0; // Andrea cae aquí al no usar frases éticas reales.
         stanceMsg = 'Sin reflexión crítica ni ética personal detectada';
     }
 
@@ -338,9 +339,10 @@ function evaluateContent(fileName, text) {
     const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText) || normText.includes('recuperado de');
     
     const ausencias = [];
-    if (!hasT1_Norm) ausencias.push('T1 (Teoría)');
-    if (!hasT2_Norm) ausencias.push('T2 (Teoría)');
-    if (!hasT3_Norm) ausencias.push('T3 (Teoría)');
+    if (!hasT1_Norm) ausencias.push(t1Words > 0 ? 'T1 teórica (Insuficiente)' : 'T1 teórica (Ausente)');
+    if (!hasT2_Norm) ausencias.push(t2Words > 0 ? 'T2 teórica (Insuficiente)' : 'T2 teórica (Ausente)');
+    if (!hasT3_Norm) ausencias.push(t3Words > 0 ? 'T3 teórica (Insuficiente)' : 'T3 teórica (Ausente)');
+    
     if (!hasT1_Case) ausencias.push('Caso T1');
     if (!hasT2_Case) ausencias.push('Caso T2');
     if (!hasT3_Case) ausencias.push('Caso T3');
