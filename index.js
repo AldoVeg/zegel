@@ -1,7 +1,7 @@
 /* ============================================================
    index.js — Auditor Estructural de Evaluación Automatizada
    Procesamiento Seguro | Filtros Minuciosos | Pastillas Visuales
-   (FORTALECIDO: Diccionarios Masivos y Casos Desvinculados)
+   (FORTALECIDO: Detección por Secciones, Enlaces Web y Lemas)
    ============================================================ */
 
 // ─── Verificación de Dependencias CDN ───
@@ -82,8 +82,6 @@ function normalizeText(text) {
 let resultadosEvaluacion = [];
 let archivosDetectados = [];
 let abortController = null;
-let sortColumn = null;
-let sortDirection = 'asc';
 let isProcessing = false;
 
 const DOM = {};
@@ -161,7 +159,7 @@ async function addFilesToList(files) {
     if (added > 0) updateFileListUI();
 }
 
-// ─── Extracción de Texto Segura ───
+// ─── Extracción de Texto ───
 async function extractTextFromPDF(file) {
     if (typeof pdfjsLib === 'undefined') throw new Error("La librería PDF.js no está cargada.");
     const arrayBuffer = await file.arrayBuffer();
@@ -171,7 +169,7 @@ async function extractTextFromPDF(file) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => item.str).join(' ') + ' ';
+        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
         page.cleanup();
     }
     return fullText;
@@ -184,56 +182,33 @@ async function extractTextFromDOCX(file) {
     return result.value || '';
 }
 
-async function extractFilesFromZip(zipFile) {
-    let extracted = [];
-    if (typeof JSZip === 'undefined') throw new Error("La librería JSZip no está cargada.");
-    const zip = await JSZip.loadAsync(zipFile);
-    const entries = Object.values(zip.files).filter(entry => !entry.dir);
-
-    for (let i = 0; i < entries.length; i++) {
-        const zipEntry = entries[i];
-        const lower = zipEntry.name.toLowerCase();
-        if (lower.endsWith('.pdf') || lower.endsWith('.docx')) {
-            let blob = await zipEntry.async('blob');
-            let file = new File([blob], zipEntry.name.split('/').pop(), {
-                type: lower.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            });
-            extracted.push({ name: file.name, type: lower.endsWith('.pdf') ? 'pdf' : 'docx', file: file, size: blob.size });
-            blob = null;
-        }
-        if (i % 3 === 0) await yieldUI();
-    }
-    return extracted;
-}
-
 // ═══════════════════════════════════════════════════════════
-// MOTOR HEURÍSTICO MINUCIOSO (DICCIONARIOS MASIVOS & LÓGICA DESVINCULADA)
+// MOTOR AUDITOR RIGUROSO (SECCIONES + NARRATIVA FLEXIBLE)
 // ═══════════════════════════════════════════════════════════
 
-const DICCIONARIO = {
+const DICCIONARIOS = {
     T1: {
-        normas: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'ds 005 2012', 'ley 25129', 'ley 26790', 'ley 30056', 'sst'],
-        conceptos: ['seguridad y salud', 'cts', 'compensacion por tiempo', 'gratificacion', 'asignacion familiar', 'utilidades', 'descanso vacacional', 'horas extras', 'riesgos laborales', 'seguro de vida ley', 'beneficios sociales', 'jornada laboral', 'remuneracion', 'implementos de seguridad', 'epps', 'accidente de trabajo']
+        keywords: ['ley 29783', 'ley 27735', 'dl 713', 'dl 650', 'dl 892', 'dl 854', 'ds 005 2012', 'ds 007 2002', 'ley 25129', 'ley 26790', 'sst', 'beneficios laborales', 'gratificacion', 'gratificaciones', 'cts', 'vacaciones', 'asignacion familiar', 'utilidades', 'horas extras', 'seguridad y salud', 'salud ocupacional', 'riesgos laborales', 'enfermedades ocupacionales', 'lesiones laborales', 'sueldos', 'remuneracion']
     },
     T2: {
-        normas: ['ley 27942', 'convenio 190', 'ds 014 2019', 'ley 31156', 'dl 1410'],
-        conceptos: ['hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'comite frente al hostigamiento', 'prevencion del acoso', 'medidas de proteccion', 'investigacion de acoso']
+        keywords: ['ley 27942', 'convenio 190', 'ds 014 2019', 'ley 31156', 'dl 1410', 'hostigamiento sexual', 'acoso sexual', 'acoso laboral', 'comite de intervencion', 'chantaje sexual', 'violencia laboral', 'ambiente hostil', 'conducta no deseada', 'violencia sexual', 'destituidos', 'destitucion']
     },
     T3: {
-        normas: ['ley 28518', 'ds 011 2012', 'ley 31396'],
-        conceptos: ['modalidad formativa', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'subvencion economica', 'facilidades horarias', 'practicante', 'plan especifico de aprendizaje', 'formacion laboral']
-    },
-    NARRATIVA_CASO: {
-        actores: ['trabajador', 'trabajadora', 'empleado', 'empleada', 'empleador', 'empresa', 'colaborador', 'colaboradora', 'demandante', 'gerente', 'jefe', 'jefatura', 'supervisor', 'practicante', 'victima', 'inspector', 'sindicato', 'recursos humanos', 'rrhh', 'operario', 'personal'],
-        conflictos: ['despidio', 'incumplio', 'vulnero', 'sufrio', 'acoso', 'accidento', 'omitio', 'afecto', 'obligo', 'coacciono', 'no pago', 'falta de pago', 'exceso de horas', 'despido arbitrario', 'hostigo', 'negligencia', 'infraccion', 'vulneracion', 'abuso'],
-        contextoLegal: ['demando', 'sanciono', 'reclamo', 'denuncio', 'multo', 'sunafil', 'tribunal constitucional', 'corte suprema', 'expediente', 'casacion', 'resolucion', 'sentencia', 'inspeccion', 'queja formal', 'ministerio de trabajo', 'mtpe', 'poder judicial', 'jurisprudencia', 'demanda laboral']
+        keywords: ['ley 28518', 'ds 011 2012', 'ley 31396', 'ley general de educacion', 'modalidad formativa', 'modalidades formativas', 'practicas preprofesionales', 'practicas profesionales', 'convenio de practicas', 'jornada formativa', 'flexibilidad horaria', 'facilidades horarias', 'horarios flexibles', 'empleo juvenil', 'estudiantes']
     }
+};
+
+const PATRONES_CASO = {
+    actores: ['trabajador', 'emplead', 'colaborad', 'demandant', 'gerent', 'jef', 'supervis', 'practicant', 'victim', 'inspect', 'sindicat', 'rrhh', 'docent', 'joven', 'personal', 'empresa', 'ripley', 'call center', 'institucion', 'ministerio'],
+    acciones: ['despid', 'incumpl', 'vulner', 'sufri', 'acos', 'accident', 'omiti', 'afect', 'oblig', 'coaccion', 'pago', 'hostig', 'negligenci', 'infracci', 'abuso', 'denunci', 'huelg', 'reclam', 'sancion', 'mult', 'destitu', 'lesion', 'reducci', 'protesta'],
+    evidenciaReal: ['http', 'https', 'www', '.pe', '.com', 'gob.pe', 'equidad.pe', 'infobae', 'la republica', 'el peruano', 'cronica viva', 'defensoria', 'sunafil', 'minedu', 'rpp', 'noticia', 'diario', 'fuente', 'segun', 'informo', 'comunicado', 'reporto', 'denuncia', 'en el ano', 'en 2023', 'en 2024', 'en 2025', 'en 2026']
 };
 
 function extractStudentIdentity(fileName, text) {
     const patterns = [
         /(?:estudiante|autor|presentado\s+por|elaborado\s+por|alumno|alumna)\s*:\s*([^\n\.]{3,60})/i,
-        /nombre\s*(?:del\s*)?(?:estudiante|alumno|autor)\s*:\s*([^\n\.]{3,60})/i
+        /nombre\s*(?:del\s*)?(?:estudiante|alumno|autor)\s*:\s*([^\n\.]{3,60})/i,
+        /([A-ZÁÉÍÓÚÑ\s]{8,50})\s*,\s*[S|J0-9]{8,12}/i
     ];
     for (let i = 0; i < patterns.length; i++) {
         const match = text.match(patterns[i]);
@@ -248,71 +223,79 @@ function evaluateContent(fileName, text) {
     const estudiante = extractStudentIdentity(fileName, text);
     const normText = normalizeText(text);
 
-    if (wordCount < 50) {
+    if (wordCount < 40) {
         return {
             estudiante: estudiante,
             c1: 0, c1Checks: [false, false, false],
             c2: 0, c2Checks: [false, false, false],
-            c3: 0, c3Checks: [false, false, false],
+            c3: 0, c3Checks: [],
             notaFinal: 0, wordCount: wordCount,
             bibliografia: { ok: false, detalle: 'Documento vacío' },
             observacion: 'Error: Contenido mínimo insuficiente para ser evaluado.'
         };
     }
 
-    // Separación en bloques semánticos (Párrafos u oraciones largas)
-    const bloques = text
-        .split(/(?:\r?\n){2,}|\.\s+/)
-        .map(p => normalizeText(p))
-        .filter(p => p.length > 20);
+    // Dividir el documento en párrafos significativos
+    const parrafos = text.split(/(?:\r?\n){2,}|\n(?=[A-Z0-9\•\-\*TEMATema])/)
+        .map(p => ({ original: p, norm: normalizeText(p) }))
+        .filter(p => p.norm.length > 15);
 
-    let palabrasT1 = 0, palabrasT2 = 0, palabrasT3 = 0;
+    // Mapeo por Temas (T1, T2, T3)
+    let t1Words = 0, t2Words = 0, t3Words = 0;
     let hasT1_Case = false, hasT2_Case = false, hasT3_Case = false;
 
-    bloques.forEach(bloque => {
-        const palabrasEnBloque = bloque.split(/\s+/).length;
+    let currentTopic = null;
 
-        // ¿El bloque menciona algún tema?
-        const esT1 = DICCIONARIO.T1.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T1.conceptos.some(kw => bloque.includes(kw));
-        const esT2 = DICCIONARIO.T2.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T2.conceptos.some(kw => bloque.includes(kw));
-        const esT3 = DICCIONARIO.T3.normas.some(kw => bloque.includes(kw)) || DICCIONARIO.T3.conceptos.some(kw => bloque.includes(kw));
+    parrafos.forEach(p => {
+        const palabrasParrafo = p.norm.split(/\s+/).length;
 
-        if (esT1) palabrasT1 += palabrasEnBloque;
-        if (esT2) palabrasT2 += palabrasEnBloque;
-        if (esT3) palabrasT3 += palabrasEnBloque;
+        // Detección de tema en el párrafo o cambio de sección
+        const isT1 = DICCIONARIOS.T1.keywords.some(kw => p.norm.includes(kw));
+        const isT2 = DICCIONARIOS.T2.keywords.some(kw => p.norm.includes(kw));
+        const isT3 = DICCIONARIOS.T3.keywords.some(kw => p.norm.includes(kw));
 
-        // Detección Estricta de Casos Narrados (C2)
-        const tieneActor = DICCIONARIO.NARRATIVA_CASO.actores.some(kw => bloque.includes(kw));
-        const tieneConflicto = DICCIONARIO.NARRATIVA_CASO.conflictos.some(kw => bloque.includes(kw));
-        const tieneContextoLegal = DICCIONARIO.NARRATIVA_CASO.contextoLegal.some(kw => bloque.includes(kw));
+        if (p.norm.includes('tema 1') || p.norm.includes('primer lugar') || (isT1 && !isT2 && !isT3)) currentTopic = 'T1';
+        else if (p.norm.includes('tema 2') || p.norm.includes('por otro lado') || (isT2 && !isT1 && !isT3)) currentTopic = 'T2';
+        else if (p.norm.includes('tema 3') || p.norm.includes('flexibilidad') || (isT3 && !isT1 && !isT2)) currentTopic = 'T3';
 
-        // Tríada estricta: Un caso real debe tener (Actor + Conflicto) o mención directa a Resolución/Sunafil
-        if ((tieneActor && tieneConflicto) || tieneContextoLegal) {
-            if (esT1) hasT1_Case = true;
-            if (esT2) hasT2_Case = true;
-            if (esT3) hasT3_Case = true;
+        const topicAssigned = currentTopic || (isT1 ? 'T1' : isT2 ? 'T2' : isT3 ? 'T3' : null);
+
+        if (topicAssigned === 'T1') t1Words += palabrasParrafo;
+        if (topicAssigned === 'T2') t2Words += palabrasParrafo;
+        if (topicAssigned === 'T3') t3Words += palabrasParrafo;
+
+        // Detector de Narrativa de Caso Real
+        const tieneActor = PATRONES_CASO.actores.some(kw => p.norm.includes(kw));
+        const tieneAccion = PATRONES_CASO.acciones.some(kw => p.norm.includes(kw));
+        const tieneEvidencia = PATRONES_CASO.evidenciaReal.some(kw => p.norm.includes(kw));
+
+        // Un caso real se valida si tiene evidencia directa (URL/Noticia) o Tríada (Actor + Acción)
+        const esCasoReal = tieneEvidencia || (tieneActor && tieneAccion);
+
+        if (esCasoReal && topicAssigned) {
+            if (topicAssigned === 'T1') hasT1_Case = true;
+            if (topicAssigned === 'T2') hasT2_Case = true;
+            if (topicAssigned === 'T3') hasT3_Case = true;
         }
     });
 
-    // ─── C1: Filtro de Densidad (Mínimo 35 palabras por tema para ser válido) ───
-    const UMBRAL_PALABRAS = 35; 
-    const hasT1_Norm = palabrasT1 >= UMBRAL_PALABRAS;
-    const hasT2_Norm = palabrasT2 >= UMBRAL_PALABRAS;
-    const hasT3_Norm = palabrasT3 >= UMBRAL_PALABRAS;
+    // ─── CRITERIO 1: Teoría y Normativa (Umbral de 35 palabras) ───
+    const UMBRAL = 35;
+    const hasT1_Norm = t1Words >= UMBRAL;
+    const hasT2_Norm = t2Words >= UMBRAL;
+    const hasT3_Norm = t3Words >= UMBRAL;
 
     const c1Checks = [hasT1_Norm, hasT2_Norm, hasT3_Norm];
-    const c1Puntos = c1Checks.filter(Boolean).length * 2; 
+    const c1Puntos = c1Checks.filter(Boolean).length * 2;
 
-    // ─── C2: Casos Reales (Efecto Dominó Desvinculado) ───
-    // AHORA: Si narró un caso excelentemente (ej. Preeliminar), se le dan los puntos de C2 
-    // aunque su teoría (C1) haya sido corta o insuficiente.
+    // ─── CRITERIO 2: Casos Reales (Desvinculado e independiente de C1) ───
     const c2Checks = [hasT1_Case, hasT2_Case, hasT3_Case];
-    const c2Puntos = c2Checks.filter(Boolean).length * 2; 
+    const c2Puntos = c2Checks.filter(Boolean).length * 2;
 
-    // ─── C3: Ética Escalonada (Diccionario masivo para capturar a "Lesly") ───
-    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima laboral', 'cultura organizacional', 'desarrollo humano', 'salud ocupacional', 'buenas practicas', 'enfoque preventivo', 'calidad de vida'];
+    // ─── CRITERIO 3: Postura Ética y Reflexión ───
+    const kwHumanista = ['dignidad', 'bienestar', 'justicia', 'equidad', 'vulnerabilidad', 'empatia', 'derechos humanos', 'desarrollo integral', 'salud mental', 'prevencion', 'integridad', 'respeto', 'clima laboral', 'salud ocupacional', 'desarrollo humano', 'buenas practicas', 'calidad de vida'];
     const kwLegalista = ['multa', 'sancion', 'reglamento', 'contingencia', 'demanda', 'indemnizacion', 'evitar sanciones', 'riesgos legales', 'reputacion', 'costos laborales'];
-    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'tradicion', 'informalidad', 'necesidades del negocio', 'no es obligatorio', 'trabajador debe adaptarse', 'exceso de proteccionismo'];
+    const kwDeficiente = ['exageracion', 'inevitable', 'costoso', 'informalidad', 'no es obligatorio', 'exceso de proteccionismo'];
 
     const hitHumanista = kwHumanista.filter(k => normText.includes(k)).length;
     const hitLegalista = kwLegalista.filter(k => normText.includes(k)).length;
@@ -325,31 +308,31 @@ function evaluateContent(fileName, text) {
         c3Puntos = 0;
         stanceMsg = 'Ética Deficiente (justifica malas prácticas)';
     } else if (hitHumanista >= 2) {
-        if (c1Puntos === 6 && c2Puntos === 6) {
+        if (c1Puntos >= 4 && c2Puntos >= 4) {
             c3Puntos = 8;
             stanceMsg = 'Ética Impecable (Postura Humana Integral)';
-        } else if (c1Puntos >= 4 && c2Puntos >= 4) {
+        } else if (c1Puntos >= 2 || c2Puntos >= 2) {
             c3Puntos = 6;
             stanceMsg = 'Ética Buena (Presenta omisiones temáticas)';
         } else {
             c3Puntos = 4;
             stanceMsg = 'Ética Parcial (Vacíos en normas o casos)';
         }
-    } else if (hitLegalista >= 2) {
+    } else if (hitLegalista >= 1) {
         c3Puntos = 4;
-        stanceMsg = 'Ética Legalista (Enfocada en evitar multas)';
+        stanceMsg = 'Ética Legalista (Enfocada en evitar multas/contingencias)';
     } else {
         c3Puntos = 0;
         stanceMsg = 'Sin reflexión crítica personal';
     }
 
-    // ─── Diagnóstico Sintético (Solo lo ausente) ───
-    const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText);
+    // ─── Diagnóstico Sintético de Omisiones ───
+    const hasAPA = /\(\s*\d{4}\s*\).{0,60}?(recuperado|http|www|ley|resolucion|diario|sunafil)/i.test(normText) || normText.includes('recuperado de');
     
     const ausencias = [];
-    if (!hasT1_Norm) ausencias.push(palabrasT1 > 0 ? 'T1 teórica (Insuficiente)' : 'T1 teórica (Ausente)');
-    if (!hasT2_Norm) ausencias.push(palabrasT2 > 0 ? 'T2 teórica (Insuficiente)' : 'T2 teórica (Ausente)');
-    if (!hasT3_Norm) ausencias.push(palabrasT3 > 0 ? 'T3 teórica (Insuficiente)' : 'T3 teórica (Ausente)');
+    if (!hasT1_Norm) ausencias.push(t1Words > 0 ? 'T1 teórica (Insuficiente)' : 'T1 teórica (Ausente)');
+    if (!hasT2_Norm) ausencias.push(t2Words > 0 ? 'T2 teórica (Insuficiente)' : 'T2 teórica (Ausente)');
+    if (!hasT3_Norm) ausencias.push(t3Words > 0 ? 'T3 teórica (Insuficiente)' : 'T3 teórica (Ausente)');
     if (!hasT1_Case) ausencias.push('Caso T1');
     if (!hasT2_Case) ausencias.push('Caso T2');
     if (!hasT3_Case) ausencias.push('Caso T3');
@@ -365,7 +348,7 @@ function evaluateContent(fileName, text) {
         estudiante: estudiante,
         c1: c1Puntos, c1Checks: c1Checks,
         c2: c2Puntos, c2Checks: c2Checks,
-        c3: c3Puntos, c3Checks: [], 
+        c3: c3Puntos, c3Checks: [],
         notaFinal: notaFinal,
         wordCount: wordCount,
         bibliografia: { ok: hasAPA, detalle: hasAPA ? 'Formato APA' : 'Sin APA' },
@@ -373,12 +356,11 @@ function evaluateContent(fileName, text) {
     };
 }
 
-// ─── Interfaz y Tabla (Restauración de Pastillas Visuales) ───
+// ─── Interfaz y Tabla ───
 function renderPill(label, isOk) {
     if (isOk) {
         return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#dcfce7; color:#15803d; border:1px solid #86efac;">' + label + '</span>';
     } else {
-        // Color Gris para indicar "Ausente"
         return '<span style="display:inline-block; padding:2px 6px; margin:1px; font-size:0.75rem; font-weight:700; border-radius:4px; background:#f3f4f6; color:#9ca3af; border:1px solid #d1d5db;">' + label + '</span>';
     }
 }
@@ -421,7 +403,6 @@ function renderTable(filterText) {
     filtrados.forEach((r, idx) => {
         const bibIcon = r.bibliografia.ok ? '<span style="color:#10b981; font-weight:bold;">✓</span>' : '<span style="color:#9ca3af;">—</span>';
         
-        // Pastillas Verdes (Aprobado) o Grises (Ausente)
         const c1Pills = renderPill('T1', r.c1Checks[0]) + renderPill('T2', r.c1Checks[1]) + renderPill('T3', r.c1Checks[2]);
         const c2Pills = renderPill('C1', r.c2Checks[0]) + renderPill('C2', r.c2Checks[1]) + renderPill('C3', r.c2Checks[2]);
         
@@ -464,7 +445,6 @@ async function processAllFiles() {
 
     isProcessing = true;
     abortController = new AbortController();
-    
     resultadosEvaluacion = [];
     
     if (DOM['loading-overlay']) DOM['loading-overlay'].classList.remove('hidden');
@@ -473,14 +453,9 @@ async function processAllFiles() {
     if (DOM['error-panel']) DOM['error-panel'].classList.add('hidden');
 
     try {
-        const total = archivosDetectados.length;
-        let procesados = 0;
-
         for (let i = 0; i < archivosDetectados.length; i++) {
             if (abortController.signal.aborted) break;
-            
             const item = archivosDetectados[i];
-            procesados++;
             
             if (DOM['loading-detail']) DOM['loading-detail'].textContent = 'Evaluando: ' + escapeHTML(item.name);
             
@@ -490,11 +465,6 @@ async function processAllFiles() {
                     text = await extractTextFromPDF(item.file);
                 } else if (item.type === 'docx') {
                     text = await extractTextFromDOCX(item.file);
-                } else if (item.type === 'zip') {
-                    // Extraer los zips en cola
-                    let extracted = await extractFilesFromZip(item.file);
-                    archivosDetectados.push(...extracted);
-                    continue; // Pasa al siguiente archivo
                 }
 
                 if (!text || text.trim().length < 20) {
@@ -523,7 +493,7 @@ async function processAllFiles() {
     }
 }
 
-// ─── Botones y Eventos Generales ───
+// ─── Eventos e Inicialización ───
 function setupEvents() {
     const dz = DOM['drop-zone'];
     if (dz) {
@@ -554,22 +524,6 @@ function setupEvents() {
                 this.value = '';
                 processAllFiles();
             }
-        });
-    }
-    
-    if (DOM['folder-input']) {
-        DOM['folder-input'].addEventListener('change', async function(e) {
-            if (this.files.length > 0) {
-                await addFilesToList(this.files);
-                this.value = '';
-                processAllFiles();
-            }
-        });
-    }
-
-    if (DOM['btn-folder']) {
-        DOM['btn-folder'].addEventListener('click', function() {
-            if (DOM['folder-input']) DOM['folder-input'].click();
         });
     }
 
@@ -604,11 +558,10 @@ function setupEvents() {
     }
 }
 
-// ─── Inicialización Absoluta ───
 function init() {
     cacheDOM();
-    setupEvents(); // Encendemos la interactividad inmediatamente para que NO se bloquee
-    checkDependencies(); // Advertimos si falta algo, pero NO bloqueamos
+    setupEvents();
+    checkDependencies();
     configurePDFJS();
 }
 
